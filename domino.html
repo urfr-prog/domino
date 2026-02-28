@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Domino Cube — Superposition</title>
+    <title>Domino Cube — Dual Layers</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -26,15 +26,75 @@
             font-size: 0.8rem;
             letter-spacing: 0.5em;
             text-transform: uppercase;
-            margin-bottom: 28px;
+            margin-bottom: 20px;
+        }
+
+        .main-container {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+        }
+
+        .cube-zone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        /* Zone de contrôle au-dessus et en-dessous */
+        .control-zone {
+            width: 300px;
+            height: 100px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            touch-action: none;
+            border-radius: 12px;
+            transition: background 0.3s;
+        }
+
+        .control-zone:active { cursor: grabbing; }
+
+        .control-zone::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 12px;
+            border: 1px solid rgba(126, 200, 227, 0.08);
+        }
+
+        .control-zone:hover::before {
+            border-color: rgba(126, 200, 227, 0.15);
+        }
+
+        .control-zone .zone-label {
+            font-size: 0.55rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            opacity: 0.25;
+            pointer-events: none;
+        }
+
+        .control-zone.top .zone-label { color: #7ec8e3; }
+        .control-zone.bottom .zone-label { color: #7ec8e3; }
+
+        /* Scène des cubes superposés */
+        .scene-wrapper {
+            width: 300px;
+            height: 300px;
+            position: relative;
         }
 
         .scene {
             width: 300px;
             height: 300px;
             perspective: 700px;
-            position: relative;
-            touch-action: none;
+            position: absolute;
+            top: 0; left: 0;
+            pointer-events: none;
         }
 
         .cube {
@@ -56,41 +116,53 @@
             border-radius: 16px;
             overflow: hidden;
             backface-visibility: hidden;
-            background: #0e0f18;
-            border: 1px solid rgba(126, 200, 227, 0.5);
-            box-shadow:
-                0 0 25px rgba(126, 200, 227, 0.08),
-                inset 0 0 30px rgba(126, 200, 227, 0.04);
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .face .icon-stack {
-            position: relative;
-            width: 100%;
-            height: 100%;
+        /* Layer 1 — même bleu froid */
+        .scene.layer1 .face {
+            background: rgba(14, 15, 24, 0.6);
+            border: 1px solid rgba(126, 200, 227, 0.5);
+            box-shadow:
+                0 0 25px rgba(126, 200, 227, 0.08),
+                inset 0 0 30px rgba(126, 200, 227, 0.04);
         }
 
-        .face svg {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
-        /* Style néon identique pour les deux couches */
-        .face svg line.icon,
-        .face svg path.icon,
-        .face svg circle.icon,
-        .face svg rect.icon {
+        .scene.layer1 svg line.icon,
+        .scene.layer1 svg path.icon,
+        .scene.layer1 svg circle.icon,
+        .scene.layer1 svg rect.icon {
             stroke: #7ec8e3; stroke-width: 2;
             stroke-linecap: round; stroke-linejoin: round;
             fill: none;
             filter: drop-shadow(0 0 4px rgba(126,200,227,0.5));
         }
-        .face svg circle.point {
+        .scene.layer1 svg circle.point {
+            fill: #7ec8e3; stroke: none;
+            filter: drop-shadow(0 0 4px rgba(126,200,227,0.5));
+        }
+
+        /* Layer 2 — même bleu froid */
+        .scene.layer2 .face {
+            background: rgba(14, 15, 24, 0.6);
+            border: 1px solid rgba(126, 200, 227, 0.5);
+            box-shadow:
+                0 0 25px rgba(126, 200, 227, 0.08),
+                inset 0 0 30px rgba(126, 200, 227, 0.04);
+        }
+
+        .scene.layer2 svg line.icon,
+        .scene.layer2 svg path.icon,
+        .scene.layer2 svg circle.icon,
+        .scene.layer2 svg rect.icon {
+            stroke: #7ec8e3; stroke-width: 2;
+            stroke-linecap: round; stroke-linejoin: round;
+            fill: none;
+            filter: drop-shadow(0 0 4px rgba(126,200,227,0.5));
+        }
+        .scene.layer2 svg circle.point {
             fill: #7ec8e3; stroke: none;
             filter: drop-shadow(0 0 4px rgba(126,200,227,0.5));
         }
@@ -102,27 +174,149 @@
         .face-top    { transform: rotateX(90deg)    translateZ(60px); }
         .face-bottom { transform: rotateX(-90deg)   translateZ(60px); }
 
-        .face-label {
-            color: rgba(126,200,227,0.25);
-            font-size: 0.7rem; letter-spacing: 0.2em; margin-top: 16px;
+        /* Faders */
+        .faders {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            align-items: center;
         }
+
+        .fader-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .fader-label {
+            font-size: 0.5rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        .fader-group .fader-label { color: rgba(126, 200, 227, 0.4); }
+
+        .fader-value {
+            font-size: 0.55rem;
+            font-variant-numeric: tabular-nums;
+            width: 32px;
+            text-align: center;
+            color: rgba(126, 200, 227, 0.3);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 140px;
+            height: 3px;
+            border-radius: 2px;
+            outline: none;
+            writing-mode: vertical-lr;
+            direction: rtl;
+            transform: rotate(180deg);
+            height: 140px;
+            width: 3px;
+        }
+
+        .fader-group input[type="range"] {
+            background: linear-gradient(to top, rgba(126,200,227,0.3), rgba(126,200,227,0.05));
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            background: #7ec8e3;
+            box-shadow: 0 0 8px rgba(126,200,227,0.5);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            background: #7ec8e3;
+            box-shadow: 0 0 8px rgba(126,200,227,0.5);
+        }
+
+        .face-labels {
+            display: flex;
+            gap: 20px;
+            margin-top: 8px;
+        }
+
+        .face-label {
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
+        }
+        .face-label { color: rgba(126, 200, 227, 0.25); }
+
         .hint {
             color: rgba(180,180,190,0.2);
-            font-size: 0.6rem; margin-top: 8px;
+            font-size: 0.55rem;
+            margin-top: 14px;
+            text-align: center;
+            line-height: 1.6;
         }
     </style>
 </head>
 <body>
-    <h1>Domino Cube — Superposition</h1>
-    <div class="scene" id="scene">
-        <div class="cube" id="cube"></div>
+    <h1>Domino Cube — Dual Layers</h1>
+
+    <div class="main-container">
+        <div class="cube-zone">
+            <!-- Zone haute = contrôle layer 1 -->
+            <div class="control-zone top" id="zoneTop">
+                <span class="zone-label">layer 1 · swipe</span>
+            </div>
+
+            <!-- Scènes superposées -->
+            <div class="scene-wrapper">
+                <div class="scene layer2" id="scene2">
+                    <div class="cube" id="cube2"></div>
+                </div>
+                <div class="scene layer1" id="scene1">
+                    <div class="cube" id="cube1"></div>
+                </div>
+            </div>
+
+            <!-- Zone basse = contrôle layer 2 -->
+            <div class="control-zone bottom" id="zoneBottom">
+                <span class="zone-label">layer 2 · swipe</span>
+            </div>
+
+            <div class="face-labels">
+                <div class="face-label" id="label1">front</div>
+                <div class="face-label" id="label2">front</div>
+            </div>
+        </div>
+
+        <!-- Faders -->
+        <div class="faders">
+            <div class="fader-group">
+                <div class="fader-label">L1</div>
+                <input type="range" id="fader1" min="0" max="100" value="100">
+                <div class="fader-value" id="faderVal1">100</div>
+            </div>
+            <div class="fader-group">
+                <div class="fader-label">L2</div>
+                <input type="range" id="fader2" min="0" max="100" value="100">
+                <div class="fader-value" id="faderVal2">100</div>
+            </div>
+        </div>
     </div>
-    <div class="face-label" id="faceLabel">front</div>
-    <div class="hint">← → ↑ ↓ / swipe = naviguer · clic / espace = rotation face</div>
+
+    <div class="hint">zone haute → layer 1 · zone basse → layer 2 · faders → opacité<br>← → ↑ ↓ / swipe · clic / espace = rotation face</div>
 
     <script>
         // ══════════════════════════════════════════════
-        //  ICÔNES ADAM — Niveau 1 : oval, twoCircles, twoPoints, square
+        //  ICÔNES ADAM — Niveau 1
         // ══════════════════════════════════════════════
 
         const ICONS = {
@@ -144,7 +338,7 @@
             return '';
         }
 
-        // 6 faces : combinaisons des 4 icônes niveau 1 (paires différentes)
+        // 6 faces : paires d'icônes — [0]=layer1, [1]=layer2
         const FACE_PAIRS = [
             ['oval',       'twoCircles'],   // front
             ['oval',       'twoPoints'],     // back
@@ -156,36 +350,40 @@
 
         const FACE_CLASSES = ['face-front','face-back','face-right','face-left','face-top','face-bottom'];
 
-        // Normales locales de chaque face
         const FACE_NORMALS = [
-            [0, 0, 1],   // front
-            [0, 0, -1],  // back
-            [1, 0, 0],   // right
-            [-1, 0, 0],  // left
-            [0, -1, 0],  // top
-            [0, 1, 0],   // bottom
+            [0, 0, 1], [0, 0, -1], [1, 0, 0], [-1, 0, 0], [0, -1, 0], [0, 1, 0],
         ];
 
-        const cubeEl = document.getElementById('cube');
-        const labelEl = document.getElementById('faceLabel');
-        const scene = document.getElementById('scene');
+        // ══════════════════════════════════════════════
+        //  BUILD TWO CUBES
+        // ══════════════════════════════════════════════
 
-        const faceEls = [];
+        const cube1El = document.getElementById('cube1');
+        const cube2El = document.getElementById('cube2');
+        const label1El = document.getElementById('label1');
+        const label2El = document.getElementById('label2');
 
-        // Build faces — une face carrée, deux SVG superposés, même style néon
+        const face1Els = [];
+        const face2Els = [];
+
         FACE_PAIRS.forEach((pair, i) => {
-            const face = document.createElement('div');
-            face.className = 'face ' + FACE_CLASSES[i];
-            face.innerHTML = `<div class="icon-stack">
-                <svg viewBox="0 0 90 44">${renderIcon(pair[1])}</svg>
-                <svg viewBox="0 0 90 44">${renderIcon(pair[0])}</svg>
-            </div>`;
-            cubeEl.appendChild(face);
-            faceEls.push(face);
+            // Layer 1 : premier icône de chaque paire
+            const f1 = document.createElement('div');
+            f1.className = 'face ' + FACE_CLASSES[i];
+            f1.innerHTML = `<svg viewBox="0 0 90 44">${renderIcon(pair[0])}</svg>`;
+            cube1El.appendChild(f1);
+            face1Els.push(f1);
+
+            // Layer 2 : second icône de chaque paire
+            const f2 = document.createElement('div');
+            f2.className = 'face ' + FACE_CLASSES[i];
+            f2.innerHTML = `<svg viewBox="0 0 90 44">${renderIcon(pair[1])}</svg>`;
+            cube2El.appendChild(f2);
+            face2Els.push(f2);
         });
 
         // ══════════════════════════════════════════════
-        //  HALO DYNAMIQUE (repris du v11 x3 en colonne)
+        //  HALO DYNAMIQUE
         // ══════════════════════════════════════════════
 
         function transformNormal(mat, n) {
@@ -200,50 +398,55 @@
             const match = str.match(/matrix3d\((.+)\)/);
             if (!match) return null;
             const v = match[1].split(',').map(Number);
-            return [
-                [v[0], v[4], v[8]],
-                [v[1], v[5], v[9]],
-                [v[2], v[6], v[10]],
-            ];
+            return [[v[0],v[4],v[8]], [v[1],v[5],v[9]], [v[2],v[6],v[10]]];
         }
 
-        function updateGlow(mat) {
+        function updateGlow(cubeEl, faceEls, mat, color, glowMul) {
+            const [r, g, b] = color;
             faceEls.forEach((faceEl, idx) => {
-                const normal = FACE_NORMALS[idx];
-                const wn = transformNormal(mat, normal);
-                const dot = wn[2];
-                const intensity = Math.max(0, dot);
+                const wn = transformNormal(mat, FACE_NORMALS[idx]);
+                const dot = Math.max(0, wn[2]);
 
-                const outerR = intensity * 35;
-                const outerA = intensity * 0.25;
-                const midR = intensity * 15;
-                const midA = intensity * 0.15;
-                const innerA = intensity * 0.1;
-                const borderA = 0.25 + intensity * 0.45;
+                const m = glowMul;
+                const outerR = dot * 35 * m;
+                const outerA = dot * 0.25 * m;
+                const midR = dot * 15 * m;
+                const midA = dot * 0.15 * m;
+                const innerA = dot * 0.1 * m;
+                const borderA = (0.25 + dot * 0.45) * m;
 
                 faceEl.style.boxShadow =
-                    `0 0 ${outerR}px rgba(126,200,227,${outerA}),` +
-                    `0 0 ${midR}px rgba(126,200,227,${midA}),` +
-                    `inset 0 0 30px rgba(126,200,227,${innerA})`;
-                faceEl.style.borderColor = `rgba(126,200,227,${borderA})`;
+                    `0 0 ${outerR}px rgba(${r},${g},${b},${outerA}),` +
+                    `0 0 ${midR}px rgba(${r},${g},${b},${midA}),` +
+                    `inset 0 0 30px rgba(${r},${g},${b},${innerA})`;
+                faceEl.style.borderColor = `rgba(${r},${g},${b},${borderA})`;
             });
         }
 
         function animateGlow() {
-            const computed = getComputedStyle(cubeEl).transform;
-            const mat = (computed && computed !== 'none') ? parseMatrix3d(computed) : null;
-            updateGlow(mat || currentMat);
+            const c1 = getComputedStyle(cube1El).transform;
+            const m1 = (c1 && c1 !== 'none') ? parseMatrix3d(c1) : null;
+            updateGlow(cube1El, face1Els, m1 || currentMat1, [126, 200, 227], glowMul1);
+
+            const c2 = getComputedStyle(cube2El).transform;
+            const m2 = (c2 && c2 !== 'none') ? parseMatrix3d(c2) : null;
+            updateGlow(cube2El, face2Els, m2 || currentMat2, [126, 200, 227], glowMul2);
+
             requestAnimationFrame(animateGlow);
         }
         requestAnimationFrame(animateGlow);
 
         // ══════════════════════════════════════════════
-        //  ROTATION MATRIX
+        //  ROTATION MATRIX — deux systèmes indépendants
         // ══════════════════════════════════════════════
 
-        let currentMat = [[1,0,0],[0,1,0],[0,0,1]];
-        let targetMat = [[1,0,0],[0,1,0],[0,0,1]];
-        let transitioning = false;
+        let currentMat1 = [[1,0,0],[0,1,0],[0,0,1]];
+        let targetMat1  = [[1,0,0],[0,1,0],[0,0,1]];
+        let trans1 = false;
+
+        let currentMat2 = [[1,0,0],[0,1,0],[0,0,1]];
+        let targetMat2  = [[1,0,0],[0,1,0],[0,0,1]];
+        let trans2 = false;
 
         function mul(A, B) {
             const R = [[0,0,0],[0,0,0],[0,0,0]];
@@ -282,93 +485,119 @@
             return '?';
         }
 
-        function addRotation(rotMatrix) {
-            if (transitioning) return;
-            transitioning = true;
-            targetMat = cleanMat(mul(rotMatrix, targetMat));
-            cubeEl.style.transform = matToCSS(targetMat);
-            labelEl.textContent = detectFace(targetMat);
-            setTimeout(() => {
-                currentMat = targetMat.map(r => [...r]);
-                transitioning = false;
-            }, 700);
-        }
-
-        function navigate(dir) {
-            switch (dir) {
-                case 'right': addRotation(rotYn90()); break;
-                case 'left':  addRotation(rotY90());  break;
-                case 'up':    addRotation(rotXn90()); break;
-                case 'down':  addRotation(rotX90());  break;
-            }
-        }
-
-        function spinCube() {
-            addRotation(rotZn90());
-        }
-
-        // ══════════════════════════════════════
-        //  INTERACTIONS
-        // ══════════════════════════════════════
-
-        let pointerStart = null;
-        let pointerMoved = false;
-
-        scene.addEventListener('pointerdown', (e) => {
-            pointerStart = { x: e.clientX, y: e.clientY };
-            pointerMoved = false;
-            scene.setPointerCapture(e.pointerId);
-        });
-
-        scene.addEventListener('pointermove', (e) => {
-            if (!pointerStart) return;
-            if (Math.hypot(e.clientX - pointerStart.x, e.clientY - pointerStart.y) > 10) pointerMoved = true;
-        });
-
-        scene.addEventListener('pointerup', (e) => {
-            if (!pointerStart) return;
-            const dx = e.clientX - pointerStart.x;
-            const dy = e.clientY - pointerStart.y;
-            const adx = Math.abs(dx), ady = Math.abs(dy);
-
-            if (!pointerMoved || Math.max(adx, ady) < 15) {
-                spinCube();
+        function addRotation(layer, rotMatrix) {
+            if (layer === 1) {
+                if (trans1) return;
+                trans1 = true;
+                targetMat1 = cleanMat(mul(rotMatrix, targetMat1));
+                cube1El.style.transform = matToCSS(targetMat1);
+                label1El.textContent = detectFace(targetMat1);
+                setTimeout(() => { currentMat1 = targetMat1.map(r => [...r]); trans1 = false; }, 700);
             } else {
-                if (adx > ady) navigate(dx > 0 ? 'left' : 'right');
-                else navigate(dy > 0 ? 'up' : 'down');
+                if (trans2) return;
+                trans2 = true;
+                targetMat2 = cleanMat(mul(rotMatrix, targetMat2));
+                cube2El.style.transform = matToCSS(targetMat2);
+                label2El.textContent = detectFace(targetMat2);
+                setTimeout(() => { currentMat2 = targetMat2.map(r => [...r]); trans2 = false; }, 700);
             }
-            pointerStart = null;
+        }
+
+        function navigate(layer, dir) {
+            switch (dir) {
+                case 'right': addRotation(layer, rotYn90()); break;
+                case 'left':  addRotation(layer, rotY90());  break;
+                case 'up':    addRotation(layer, rotXn90()); break;
+                case 'down':  addRotation(layer, rotX90());  break;
+            }
+        }
+
+        function spinCube(layer) {
+            addRotation(layer, rotZn90());
+        }
+
+        // ══════════════════════════════════════════════
+        //  INTERACTIONS — zones de contrôle
+        // ══════════════════════════════════════════════
+
+        function setupZone(zoneEl, layer) {
+            let pointerStart = null;
+            let pointerMoved = false;
+
+            zoneEl.addEventListener('pointerdown', (e) => {
+                pointerStart = { x: e.clientX, y: e.clientY };
+                pointerMoved = false;
+                zoneEl.setPointerCapture(e.pointerId);
+            });
+
+            zoneEl.addEventListener('pointermove', (e) => {
+                if (!pointerStart) return;
+                if (Math.hypot(e.clientX - pointerStart.x, e.clientY - pointerStart.y) > 10) pointerMoved = true;
+            });
+
+            zoneEl.addEventListener('pointerup', (e) => {
+                if (!pointerStart) return;
+                const dx = e.clientX - pointerStart.x;
+                const dy = e.clientY - pointerStart.y;
+                const adx = Math.abs(dx), ady = Math.abs(dy);
+
+                if (!pointerMoved || Math.max(adx, ady) < 15) {
+                    spinCube(layer);
+                } else {
+                    if (adx > ady) navigate(layer, dx > 0 ? 'left' : 'right');
+                    else navigate(layer, dy > 0 ? 'up' : 'down');
+                }
+                pointerStart = null;
+            });
+
+            zoneEl.addEventListener('pointercancel', () => { pointerStart = null; });
+        }
+
+        setupZone(document.getElementById('zoneTop'), 1);
+        setupZone(document.getElementById('zoneBottom'), 2);
+
+        // Clavier : Shift+flèches = layer 1, flèches seules = layer 2
+        document.addEventListener('keydown', (e) => {
+            if (e.shiftKey) {
+                switch (e.key) {
+                    case 'ArrowRight': navigate(1, 'right'); break;
+                    case 'ArrowLeft':  navigate(1, 'left');  break;
+                    case 'ArrowUp':    navigate(1, 'up');    e.preventDefault(); break;
+                    case 'ArrowDown':  navigate(1, 'down');  e.preventDefault(); break;
+                }
+            } else {
+                switch (e.key) {
+                    case 'ArrowRight': navigate(2, 'right'); break;
+                    case 'ArrowLeft':  navigate(2, 'left');  break;
+                    case 'ArrowUp':    navigate(2, 'up');    e.preventDefault(); break;
+                    case 'ArrowDown':  navigate(2, 'down');  e.preventDefault(); break;
+                    case ' ':          spinCube(2);          e.preventDefault(); break;
+                }
+            }
         });
 
-        scene.addEventListener('pointercancel', () => { pointerStart = null; });
+        // ══════════════════════════════════════════════
+        //  FADERS — opacité
+        // ══════════════════════════════════════════════
 
-        let accX = 0, accY = 0, cooldown = false, resetTimer = null;
-        scene.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            if (cooldown) return;
-            accX += e.deltaX; accY += e.deltaY;
-            clearTimeout(resetTimer);
-            resetTimer = setTimeout(() => { accX = 0; accY = 0; }, 150);
-            const ax = Math.abs(accX), ay = Math.abs(accY), T = 30;
-            if (ax > T && ax >= ay) {
-                navigate(accX > 0 ? 'right' : 'left');
-                accX = 0; accY = 0; cooldown = true;
-                setTimeout(() => { cooldown = false; }, 400);
-            } else if (ay > T) {
-                navigate(accY > 0 ? 'down' : 'up');
-                accX = 0; accY = 0; cooldown = true;
-                setTimeout(() => { cooldown = false; }, 400);
-            }
-        }, { passive: false });
+        const fader1 = document.getElementById('fader1');
+        const fader2 = document.getElementById('fader2');
+        const faderVal1 = document.getElementById('faderVal1');
+        const faderVal2 = document.getElementById('faderVal2');
 
-        document.addEventListener('keydown', (e) => {
-            switch (e.key) {
-                case 'ArrowRight': navigate('right'); break;
-                case 'ArrowLeft':  navigate('left');  break;
-                case 'ArrowUp':    navigate('up');    e.preventDefault(); break;
-                case 'ArrowDown':  navigate('down');  e.preventDefault(); break;
-                case ' ':          spinCube();         e.preventDefault(); break;
-            }
+        let glowMul1 = 1;
+        let glowMul2 = 1;
+
+        fader1.addEventListener('input', () => {
+            const v = fader1.value;
+            faderVal1.textContent = v;
+            glowMul1 = v / 100;
+        });
+
+        fader2.addEventListener('input', () => {
+            const v = fader2.value;
+            faderVal2.textContent = v;
+            glowMul2 = v / 100;
         });
     </script>
 </body>
