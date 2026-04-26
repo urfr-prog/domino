@@ -369,13 +369,13 @@
             // Snapshot de la grille actuelle
             const oldGrid = grid.map(row => [...row]);
 
-            // Positions actuelles des membres
-            const targets = [];
+            // Positions actuelles de tous les membres
+            const allMembers = [];
             for (const ti of familySet) {
                 for (let r = 0; r < ROWS; r++) {
                     for (let c = 0; c < COLS; c++) {
                         if (oldGrid[r][c] === ti) {
-                            targets.push({
+                            allMembers.push({
                                 tileIndex: ti,
                                 fromR: r, fromC: c,
                                 toR: ((r + dr) % ROWS + ROWS) % ROWS,
@@ -386,82 +386,69 @@
                 }
             }
 
-            // Set des cases cibles de la famille
-            const targetKeys = new Set(targets.map(t => t.toR + ',' + t.toC));
+            // Séparer : "movers" (cible = non-membre) vs "stayers" (cible = membre)
+            const movers = [];
+            for (const m of allMembers) {
+                const targetOccupant = oldGrid[m.toR][m.toC];
+                if (!familySet.has(targetOccupant)) {
+                    movers.push(m);
+                }
+            }
 
-            // Non-famille qui se trouvent sur une case cible : ils doivent bouger
-            // Chaque non-famille va à la source DU MEMBRE QUI ARRIVE sur sa case
+            // Cas spécial : aucun mover = bloc fermé, mouvement global classique
+            if (movers.length === 0) {
+                const targets = allMembers;
+                const swaps = [];
+                const targetKeys = new Set(targets.map(t => t.toR + ',' + t.toC));
+                const targetToSource = {};
+                for (const t of targets) {
+                    targetToSource[t.toR + ',' + t.toC] = { r: t.fromR, c: t.fromC };
+                    const occupant = oldGrid[t.toR][t.toC];
+                    if (!familySet.has(occupant)) {
+                        swaps.push({ normalTile: occupant, toR: t.fromR, toC: t.fromC });
+                    }
+                }
+                for (const s of swaps) {
+                    let destR = s.toR, destC = s.toC, key = destR + ',' + destC;
+                    while (targetKeys.has(key)) {
+                        const src = targetToSource[key];
+                        destR = src.r; destC = src.c; key = destR + ',' + destC;
+                    }
+                    s.toR = destR; s.toC = destC;
+                }
+                const newGrid = oldGrid.map(row => [...row]);
+                for (const t of targets) newGrid[t.fromR][t.fromC] = -99;
+                for (const t of targets) newGrid[t.toR][t.toC] = t.tileIndex;
+                for (const s of swaps) newGrid[s.toR][s.toC] = s.normalTile;
+                for (let r = 0; r < ROWS; r++)
+                    for (let c = 0; c < COLS; c++)
+                        if (newGrid[r][c] < 0) { console.error('BUG', r, c); isAnimating = false; return; }
+                grid = newGrid;
+                animateMove(targets, swaps, dr, dc);
+                moveCount++;
+                document.getElementById('moveCount').textContent = moveCount;
+                return;
+            }
+
+            // Cas normal : seuls les movers (têtes de bloc) bougent
+            // Chaque mover swap avec le non-membre sur sa cible
+            const targets = movers;
             const swaps = [];
-            for (const t of targets) {
-                const occupant = oldGrid[t.toR][t.toC];
-                if (!familySet.has(occupant)) {
-                    // Ce non-famille est poussé par ce membre précis
-                    // Il va à la source de CE membre
-                    swaps.push({ normalTile: occupant, toR: t.fromR, toC: t.fromC });
-                }
-            }
-
-            // Mais attention : si la source de ce membre est AUSSI une case cible
-            // d'un autre membre, alors il y a conflit.
-            // Dans ce cas, il faut chaîner : le non-famille va à la source du membre
-            // dont la cible est cette source, etc.
-            // 
-            // Simplifions : on sait que le nombre de cases libérées (sources non-cibles)
-            // = le nombre de non-famille déplacés.
-            // On construit la chaîne : pour chaque non-famille, on suit la chaîne
-            // de sources jusqu'à trouver une source qui n'est pas une cible.
-
-            // Map : cible -> source pour les membres
-            const targetToSource = {};
-            for (const t of targets) {
-                targetToSource[t.toR + ',' + t.toC] = { r: t.fromR, c: t.fromC };
-            }
-
-            // Pour chaque swap, suivre la chaîne
-            for (const s of swaps) {
-                let destR = s.toR;
-                let destC = s.toC;
-                let key = destR + ',' + destC;
-                // Tant que la destination est aussi une case cible d'un membre,
-                // on suit vers la source de ce membre
-                while (targetKeys.has(key)) {
-                    const src = targetToSource[key];
-                    destR = src.r;
-                    destC = src.c;
-                    key = destR + ',' + destC;
-                }
-                s.toR = destR;
-                s.toC = destC;
+            for (const m of movers) {
+                const occupant = oldGrid[m.toR][m.toC];
+                swaps.push({ normalTile: occupant, toR: m.fromR, toC: m.fromC });
             }
 
             // Construire la nouvelle grille
             const newGrid = oldGrid.map(row => [...row]);
-
-            // Effacer toutes les positions sources des membres
-            for (const t of targets) {
-                newGrid[t.fromR][t.fromC] = -99;
-            }
-
-            // Placer les membres à leurs cibles
-            for (const t of targets) {
-                newGrid[t.toR][t.toC] = t.tileIndex;
-            }
-
-            // Placer les non-famille à leurs destinations chaînées
-            for (const s of swaps) {
-                newGrid[s.toR][s.toC] = s.normalTile;
-            }
+            for (const t of targets) newGrid[t.fromR][t.fromC] = -99;
+            for (const t of targets) newGrid[t.toR][t.toC] = t.tileIndex;
+            for (const s of swaps) newGrid[s.toR][s.toC] = s.normalTile;
 
             // Vérification
-            for (let r = 0; r < ROWS; r++) {
-                for (let c = 0; c < COLS; c++) {
-                    if (newGrid[r][c] === -99 || newGrid[r][c] < 0) {
-                        console.error('BUG: case non remplie à', r, c);
-                        isAnimating = false;
-                        return;
-                    }
-                }
-            }
+            for (let r = 0; r < ROWS; r++)
+                for (let c = 0; c < COLS; c++)
+                    if (newGrid[r][c] < 0) { console.error('BUG', r, c); isAnimating = false; return; }
 
             grid = newGrid;
             animateMove(targets, swaps, dr, dc);
