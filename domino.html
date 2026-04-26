@@ -1,680 +1,492 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ADAM Grid 6×10 – v13</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; overflow-x: hidden; }
-  body {
-    background: #0a0e14;
-    display: flex; flex-direction: column;
-    justify-content: center; align-items: center;
-    min-height: 100vh;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    color: rgba(220,220,235,0.9);
-    touch-action: none; user-select: none;
-    padding: 10px 0;
-  }
-  .info-bar {
-    display: flex; gap: 14px; margin-bottom: 10px;
-    font-size: 0.6rem; color: rgba(180,180,200,0.5); letter-spacing: 0.1em;
-  }
-  .info-bar span { color: rgba(220,220,235,0.8); }
-  .sound-btn {
-    background: transparent; border: none; color: rgba(220,220,235,0.6);
-    font-size: 0.75rem; cursor: pointer; padding: 0;
-  }
-  .sound-btn.off { color: rgba(180,180,200,0.25); }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KANNA - Silver Gold Cosmic v2</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; overflow: hidden; touch-action: none; }
 
-  /* Grille 6 colonnes × 10 lignes — dimensions adaptatives pour iPhone */
-  /* Cell = (min(viewport, 380) - padding - 5*gap) / 6 */
-  :root {
-    --cell: calc((min(100vw, 380px) - 20px - 5 * 3px) / 6);
-    --gap: 3px;
-    --ct: calc(var(--cell) + var(--gap));
-  }
-  .grid-wrap {
-    position: relative;
-    width: calc(var(--cell) * 6 + var(--gap) * 5);
-    height: calc(var(--cell) * 10 + var(--gap) * 9);
-  }
-  .cell { position: absolute; width: var(--cell); height: var(--cell); }
-  .square {
-    width: 100%; height: 100%; border-radius: 8px;
-    border: 1.5px solid transparent;
-    display: flex; align-items: center; justify-content: center;
-    position: relative; cursor: pointer;
-  }
-  .square.empty {
-    border: 1px dashed rgba(255,255,255,0.05);
-    background: rgba(255,255,255,0.01); cursor: default;
-  }
-  /* BLOC NOIR : obstacle fixe, ni cliquable ni déplaçable */
-  .square.block {
-    border: 1px solid rgba(255,255,255,0.04);
-    background: #000;
-    background-image:
-      linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 50%),
-      radial-gradient(circle at 30% 30%, rgba(255,255,255,0.025), transparent 60%);
-    cursor: default; box-shadow: inset 0 0 8px rgba(0,0,0,0.8);
-  }
-  .square svg { width: 60%; height: 60%; pointer-events: none; }
-  svg .pi { stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+        body {
+            background-color: #12131a;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
 
-  .square.white { border-color: rgba(180,180,190,0.25); background: rgba(180,180,190,0.03); }
-  .square.white svg .pi { stroke: rgba(180,180,190,0.5); }
-  .square.silver { border-color: rgba(34,211,238,0.4); background: rgba(34,211,238,0.05); box-shadow: 0 0 10px rgba(34,211,238,0.1); }
-  .square.silver svg .pi { stroke: #22d3ee; filter: drop-shadow(0 0 3px rgba(34,211,238,0.5)); }
-  .square.gold { border-color: rgba(255,215,0,0.45); background: rgba(255,215,0,0.05); box-shadow: 0 0 12px rgba(255,215,0,0.12); }
-  .square.gold svg .pi { stroke: #ffd700; filter: drop-shadow(0 0 3px rgba(255,215,0,0.6)); }
-  .square.emerald { border-color: rgba(52,211,153,0.5); background: rgba(52,211,153,0.05); box-shadow: 0 0 14px rgba(52,211,153,0.15); }
-  .square.emerald svg .pi { stroke: #34d399; filter: drop-shadow(0 0 4px rgba(52,211,153,0.7)); }
-  .square.cosmic { border-color: rgba(196,181,253,0.45); background: rgba(131,56,236,0.06); box-shadow: 0 0 16px rgba(131,56,236,0.18); }
-  .square.cosmic svg .pi { stroke: #c4b5fd; filter: drop-shadow(0 0 4px rgba(131,56,236,0.7)); }
-  .square.supernovae { border-color: rgba(255,160,20,0.5); background: rgba(255,140,0,0.06); box-shadow: 0 0 18px rgba(255,140,0,0.2); }
-  .square.supernovae svg .pi { stroke: #ffa014; filter: drop-shadow(0 0 4px rgba(255,160,20,0.8)); }
-  .square.plasma { border-color: rgba(255,32,96,0.55); background: rgba(255,20,80,0.06); box-shadow: 0 0 16px rgba(255,32,96,0.2); animation: pp 1.8s ease-in-out infinite; }
-  .square.plasma svg .pi { stroke: #ff2060; filter: drop-shadow(0 0 4px rgba(255,32,96,0.8)); }
-  @keyframes pp { 0%,100%{box-shadow:0 0 16px rgba(255,32,96,0.2)} 50%{box-shadow:0 0 28px rgba(255,32,96,0.5)} }
+        .grid-wrapper {
+            position: relative;
+            width: 890px;
+            height: 440px;
+            overflow: hidden;
+        }
 
-  .legend {
-    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
-    font-size: 0.5rem; color: rgba(180,180,200,0.5);
-    max-width: min(100vw, 380px); justify-content: center;
-  }
-  .legend-item {
-    display: flex; align-items: center; gap: 4px;
-    padding: 2px 6px; border-radius: 5px;
-    border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);
-  }
-  .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
-  .legend-dir { color: rgba(220,220,235,0.6); font-size: 0.45rem; }
-  .toast {
-    position: fixed; bottom: 20px; left: 50%;
-    transform: translateX(-50%) translateY(60px);
-    background: rgba(22,23,38,0.95); border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 8px; padding: 8px 16px; font-size: 0.65rem;
-    transition: transform 0.25s ease-out; z-index: 300; pointer-events: none;
-  }
-  .toast.show { transform: translateX(-50%) translateY(0); }
-  button.reset-btn {
-    margin-top: 8px; padding: 5px 16px; border-radius: 7px;
-    border: 1px solid rgba(34,211,238,0.4); background: rgba(34,211,238,0.08);
-    color: #22d3ee; font-family: inherit; font-size: 0.55rem;
-    letter-spacing: 0.1em; cursor: pointer; transition: all 0.15s;
-  }
-  button.reset-btn:hover { background: rgba(34,211,238,0.18); border-color: #22d3ee; }
-</style>
+        .grid-container {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+        }
+
+        .square {
+            width: 80px; height: 80px;
+            background-color: #12131a;
+            border: 1px solid rgba(180, 180, 190, 0.35);
+            border-radius: 14px;
+            position: absolute;
+            overflow: hidden;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .square:hover { border-color: rgba(180, 180, 190, 0.55); }
+        .square svg { width: 100%; height: 100%; pointer-events: none; }
+
+        svg .separator { stroke: rgba(180, 180, 190, 0.35); stroke-width: 1; }
+        svg line.icon, svg path.icon, svg circle.icon, svg rect.icon, svg polyline.icon {
+            stroke: rgba(220, 220, 230, 0.8); stroke-width: 2;
+            stroke-linecap: round; stroke-linejoin: round; fill: none;
+        }
+        svg circle.point { fill: rgba(220, 220, 230, 0.8); stroke: none; }
+
+        /* ========== SILVER ========== */
+        .square.silver {
+            border-color: rgba(126, 200, 227, 0.7);
+            box-shadow: 0 0 15px rgba(126, 200, 227, 0.25), inset 0 0 20px rgba(126, 200, 227, 0.05);
+        }
+        .square.silver svg line.icon, .square.silver svg path.icon,
+        .square.silver svg circle.icon, .square.silver svg rect.icon {
+            stroke: #7ec8e3; filter: drop-shadow(0 0 3px rgba(126, 200, 227, 0.5));
+        }
+        .square.silver svg circle.point { fill: #7ec8e3; filter: drop-shadow(0 0 3px rgba(126, 200, 227, 0.5)); }
+        .square.silver svg .separator { stroke: rgba(126, 200, 227, 0.4); }
+
+        /* ========== GOLD ========== */
+        .square.gold {
+            border-color: rgba(255, 215, 0, 0.7);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3), inset 0 0 20px rgba(255, 215, 0, 0.05);
+        }
+        .square.gold svg line.icon, .square.gold svg path.icon,
+        .square.gold svg circle.icon, .square.gold svg rect.icon {
+            stroke: #ffd700; filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.6));
+        }
+        .square.gold svg circle.point { fill: #ffd700; filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.6)); }
+        .square.gold svg .separator { stroke: rgba(255, 215, 0, 0.4); }
+
+        /* ========== COSMIC ========== */
+        @property --cosmic-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+
+        .square.cosmic {
+            border: 2px solid transparent;
+            background:
+                linear-gradient(#12131a, #12131a) padding-box,
+                conic-gradient(from var(--cosmic-angle, 0deg), #ff006e, #8338ec, #06b6d4, #34d399, #ffd700, #ff006e) border-box;
+            box-shadow:
+                0 0 40px rgba(131, 56, 236, 0.6),
+                0 0 60px rgba(255, 0, 110, 0.3),
+                0 0 80px rgba(6, 182, 212, 0.3),
+                inset 0 0 40px rgba(131, 56, 236, 0.15);
+            animation: cosmicRotate 4s linear infinite, cosmicPulse 2s ease-in-out infinite;
+        }
+        .square.cosmic svg line.icon, .square.cosmic svg path.icon,
+        .square.cosmic svg circle.icon, .square.cosmic svg rect.icon {
+            stroke: #c4b5fd;
+            filter: drop-shadow(0 0 8px rgba(131, 56, 236, 0.9)) drop-shadow(0 0 12px rgba(255, 0, 110, 0.6));
+            animation: cosmicIconShift 3s ease-in-out infinite;
+        }
+        .square.cosmic svg circle.point {
+            fill: #c4b5fd;
+            filter: drop-shadow(0 0 8px rgba(131, 56, 236, 0.9));
+            animation: cosmicPointPulse 1.5s ease-in-out infinite;
+        }
+        .square.cosmic svg .separator { stroke: rgba(196, 181, 253, 0.7); }
+
+        @keyframes cosmicRotate { to { --cosmic-angle: 360deg; } }
+        @keyframes cosmicPulse {
+            0%, 100% { box-shadow: 0 0 40px rgba(131, 56, 236, 0.6), 0 0 60px rgba(255, 0, 110, 0.3), 0 0 80px rgba(6, 182, 212, 0.3), inset 0 0 40px rgba(131, 56, 236, 0.15); }
+            50% { box-shadow: 0 0 55px rgba(131, 56, 236, 0.8), 0 0 80px rgba(255, 0, 110, 0.5), 0 0 100px rgba(6, 182, 212, 0.4), inset 0 0 50px rgba(131, 56, 236, 0.2); }
+        }
+        @keyframes cosmicIconShift { 0%, 100% { stroke: #c4b5fd; } 33% { stroke: #22d3ee; } 66% { stroke: #f472b6; } }
+        @keyframes cosmicPointPulse { 0%, 100% { fill: #c4b5fd; } 50% { fill: #f472b6; } }
+
+        /* ========== INFO ========== */
+        .move-counter {
+            color: rgba(180, 180, 190, 0.5);
+            font-size: 13px;
+            letter-spacing: 0.1em;
+            margin-bottom: 12px;
+            display: flex;
+            gap: 20px;
+        }
+        .move-counter .silver-label { color: #7ec8e3; }
+        .move-counter .gold-label { color: #ffd700; }
+        .move-counter .cosmic-label { color: #c4b5fd; }
+    </style>
 </head>
 <body>
 
-<div class="info-bar">
-  <div>Coups: <span id="stat-moves">0</span></div>
-  <div>Pièces: <span id="stat-pieces">0</span></div>
-  <div>6 × 10</div>
-  <button class="sound-btn" id="sound-btn" onclick="toggleSound()">♪</button>
-</div>
-<div class="grid-wrap"><div id="grid"></div></div>
-<button class="reset-btn" onclick="resetAll()">↺ Reset</button>
-<div class="legend" id="legend"></div>
-<div class="toast" id="toast"></div>
+    <div class="move-counter">
+        <span>MOVES: <span id="moveCount">0</span></span>
+        <span class="silver-label">● 7 Silver</span>
+        <span class="gold-label">● 6 Gold</span>
+        <span class="cosmic-label">● 5 Cosmic</span>
+    </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-<script>
-// =============================================
-// GRILLE : 6 colonnes × 10 lignes (portrait iPhone)
-// =============================================
-const COLS = 6, ROWS = 10, TOTAL = COLS * ROWS; // 60
+    <div class="grid-wrapper">
+        <div class="grid-container" id="gridContainer"></div>
+    </div>
 
-const ICONS = {
-  chevron:  '<path class="pi" d="M14 36 L26 16 L38 36"/>',
-  arc:      '<path class="pi" d="M12 32 C12 16, 40 16, 40 32"/>',
-  arrow:    '<path class="pi" d="M12 26 L40 26 M32 18 L40 26 L32 34"/>',
-  zigzag:   '<path class="pi" d="M10 34 L18 18 L26 34 L34 18 L42 34"/>',
-  triangle: '<path class="pi" d="M26 12 L40 38 L12 38 Z"/>',
-  hook:     '<path class="pi" d="M18 14 L18 32 Q18 38 24 38 L34 38"/>',
-  slash:    '<path class="pi" d="M18 38 L34 14"/>',
-  flag:     '<path class="pi" d="M16 38 L16 12 L36 18 L16 24"/>',
-};
+    <script>
+        const COLS = 10;
+        const ROWS = 5;
+        const CELL_SIZE = 80;
+        const GAP = 10;
+        const CELL_TOTAL = CELL_SIZE + GAP;
+        const GRID_WIDTH = COLS * CELL_TOTAL;
+        const GRID_HEIGHT = ROWS * CELL_TOTAL;
 
-const MOVE_DIRS = {
-  white: null,
-  silver: [[1,0],[-1,0]],
-  gold: [[1,1],[1,-1],[-1,1],[-1,-1]],
-  emerald: [[0,1],[0,-1]],
-  cosmic: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]],
-  supernovae: [[1,0],[-1,0],[0,1],[0,-1]],
-  plasma: [[1,0],[-1,0],[0,1],[0,-1]],
-};
+        const tilesData = [
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 12 22 L 22 35 L 32 22"/><path class="icon" d="M 48 58 L 58 45 L 68 58"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="25" cy="20" r="8"/><circle class="icon" cx="55" cy="20" r="8"/><circle class="icon" cx="40" cy="60" r="8"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 10 55 L 10 40 L 22 40 L 22 25 L 34 25"/><line class="icon" x1="46" y1="55" x2="70" y2="25"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 10 22 L 22 22 L 30 12 L 38 32 L 46 17 L 54 22 L 70 22"/><line class="icon" x1="10" y1="58" x2="70" y2="58"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="12" y1="25" x2="32" y2="55"/><line class="icon" x1="32" y1="25" x2="12" y2="55"/><line class="icon" x1="55" y1="25" x2="55" y2="55"/><line class="icon" x1="48" y1="40" x2="68" y2="40"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 18 28 Q 40 8 62 28"/><path class="icon" d="M 18 52 Q 40 72 62 52"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="point" cx="22" cy="22" r="3"/><circle class="point" cx="12" cy="50" r="3"/><circle class="point" cx="32" cy="50" r="3"/><circle class="point" cx="54" cy="28" r="3"/><circle class="point" cx="64" cy="40" r="3"/><circle class="point" cx="54" cy="52" r="3"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 10 25 Q 25 15 40 25 Q 55 35 70 25"/><path class="icon" d="M 10 55 Q 25 65 40 55 Q 55 45 70 55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="22" y1="20" x2="22" y2="60"/><circle class="point" cx="22" cy="20" r="4"/><line class="icon" x1="58" y1="20" x2="58" y2="60"/><circle class="point" cx="58" cy="60" r="4"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 28 25 Q 10 40 28 55 Q 35 60 35 40"/><circle class="point" cx="58" cy="40" r="4"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><line class="icon" x1="40" y1="32" x2="40" y2="12"/><path class="icon" d="M 30 22 L 40 12 L 50 22"/><line class="icon" x1="40" y1="68" x2="40" y2="48"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 22 40 L 12 50 L 22 60 L 32 50 Z"/><rect class="icon" x="50" y="30" width="18" height="18" rx="2"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="40" cy="20" r="10"/><line class="icon" x1="40" y1="30" x2="40" y2="55"/><line class="icon" x1="30" y1="65" x2="50" y2="65"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 12 25 L 32 40 L 12 55"/><circle class="point" cx="58" cy="32" r="3"/><circle class="point" cx="58" cy="48" r="3"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><line class="icon" x1="20" y1="12" x2="20" y2="32"/><line class="icon" x1="40" y1="12" x2="40" y2="32"/><line class="icon" x1="60" y1="12" x2="60" y2="32"/><path class="icon" d="M 25 55 Q 40 70 55 55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="10" y1="32" x2="34" y2="32"/><line class="icon" x1="10" y1="48" x2="34" y2="48"/><circle class="icon" cx="58" cy="40" r="12"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 20 32 L 40 12 L 60 32"/><path class="icon" d="M 25 60 L 40 48 L 55 60"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 12 55 L 22 25 L 32 55"/><line class="icon" x1="15" y1="45" x2="29" y2="45"/><line class="icon" x1="48" y1="30" x2="68" y2="30"/><line class="icon" x1="48" y1="50" x2="68" y2="50"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="25" cy="20" r="8"/><circle class="icon" cx="55" cy="20" r="8"/><line class="icon" x1="25" y1="28" x2="40" y2="60"/><line class="icon" x1="55" y1="28" x2="40" y2="60"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><rect class="icon" x="10" y="25" width="24" height="30" rx="3"/><line class="icon" x1="48" y1="28" x2="68" y2="28"/><line class="icon" x1="48" y1="40" x2="68" y2="40"/><line class="icon" x1="48" y1="52" x2="68" y2="52"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 15 20 Q 40 35 65 20"/><path class="icon" d="M 15 60 Q 40 45 65 60"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="22" y1="22" x2="22" y2="58"/><circle class="point" cx="22" cy="22" r="3"/><circle class="point" cx="22" cy="40" r="3"/><circle class="point" cx="22" cy="58" r="3"/><path class="icon" d="M 50 30 L 66 40 L 50 50"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="40" cy="20" r="8"/><line class="icon" x1="40" y1="28" x2="25" y2="55"/><line class="icon" x1="40" y1="28" x2="55" y2="55"/><line class="icon" x1="25" y1="55" x2="55" y2="55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 10 30 Q 22 50 34 30"/><path class="icon" d="M 46 50 Q 58 30 70 50"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><line class="icon" x1="20" y1="20" x2="60" y2="20"/><line class="icon" x1="30" y1="30" x2="50" y2="30"/><circle class="point" cx="40" cy="58" r="5"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="point" cx="12" cy="40" r="4"/><circle class="point" cx="22" cy="28" r="4"/><circle class="point" cx="32" cy="52" r="4"/><line class="icon" x1="50" y1="25" x2="50" y2="55"/><line class="icon" x1="60" y1="30" x2="60" y2="50"/><line class="icon" x1="70" y1="35" x2="70" y2="45"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 20 15 L 60 15 L 60 32 L 20 32 Z"/><line class="icon" x1="30" y1="55" x2="50" y2="55"/><line class="icon" x1="40" y1="55" x2="40" y2="68"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 22 20 L 22 45 Q 22 58 10 58"/><path class="icon" d="M 58 60 L 58 35 Q 58 22 70 22"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="25" cy="20" r="6"/><circle class="icon" cx="55" cy="20" r="6"/><line class="icon" x1="25" y1="26" x2="25" y2="32"/><line class="icon" x1="55" y1="26" x2="55" y2="32"/><path class="icon" d="M 20 55 L 40 48 L 60 55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 22 22 L 10 40 L 22 58 L 34 40 Z"/><line class="icon" x1="48" y1="40" x2="70" y2="40"/><circle class="point" cx="48" cy="40" r="3"/><circle class="point" cx="70" cy="40" r="3"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="22" cy="20" r="8"/><circle class="icon" cx="58" cy="20" r="8"/><path class="icon" d="M 30 55 L 40 65 L 50 55 L 40 45 Z"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="10" y1="25" x2="34" y2="25"/><line class="icon" x1="22" y1="25" x2="22" y2="55"/><circle class="point" cx="58" cy="30" r="4"/><circle class="point" cx="58" cy="50" r="4"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 22 12 L 22 28 L 38 28"/><path class="icon" d="M 58 28 L 58 12 L 42 12"/><path class="icon" d="M 30 55 Q 40 68 50 55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 22 50 Q 10 35 22 22 Q 34 35 22 50"/><line class="icon" x1="50" y1="30" x2="68" y2="30"/><line class="icon" x1="50" y1="50" x2="68" y2="50"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 22 32 L 22 12 Q 40 8 58 12 L 58 32"/><circle class="point" cx="30" cy="55" r="3"/><circle class="point" cx="50" cy="55" r="3"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="point" cx="22" cy="30" r="4"/><circle class="point" cx="22" cy="50" r="4"/><line class="icon" x1="22" y1="34" x2="22" y2="46"/><circle class="point" cx="58" cy="40" r="4"/><line class="icon" x1="54" y1="36" x2="46" y2="28"/><line class="icon" x1="54" y1="44" x2="46" y2="52"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 25 20 Q 55 15 55 32"/><path class="icon" d="M 35 25 Q 50 22 50 30"/><path class="icon" d="M 25 60 Q 55 65 55 48"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 10 20 L 34 20 L 22 40 L 34 60 L 10 60 L 22 40 Z"/><line class="icon" x1="50" y1="40" x2="70" y2="40"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 10 20 L 25 20 L 30 10 L 40 30 L 50 10 L 55 20 L 70 20"/><line class="icon" x1="20" y1="60" x2="60" y2="60"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 34 40 Q 20 25 10 40 Q 20 55 34 40"/><path class="icon" d="M 46 40 Q 60 25 70 40 Q 60 55 46 40"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><line class="icon" x1="15" y1="20" x2="35" y2="20"/><line class="icon" x1="35" y1="20" x2="35" y2="32"/><line class="icon" x1="45" y1="20" x2="65" y2="20"/><circle class="point" cx="40" cy="60" r="5"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="22" y1="60" x2="22" y2="35"/><line class="icon" x1="22" y1="35" x2="12" y2="22"/><line class="icon" x1="22" y1="35" x2="32" y2="22"/><path class="icon" d="M 50 35 L 60 25 L 70 35"/><path class="icon" d="M 50 55 L 60 45 L 70 55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 12 12 L 12 28 L 28 28"/><path class="icon" d="M 68 12 L 68 28 L 52 28"/><path class="icon" d="M 12 68 L 12 52 L 28 52"/><path class="icon" d="M 68 68 L 68 52 L 52 52"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 28 28 A 14 14 0 1 0 28 52 A 10 10 0 1 1 28 28"/><circle class="point" cx="58" cy="40" r="6"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><line class="icon" x1="15" y1="20" x2="65" y2="20" style="stroke-width: 4"/><line class="icon" x1="15" y1="60" x2="65" y2="60"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="icon" cx="22" cy="28" r="8"/><circle class="icon" cx="22" cy="52" r="8"/><line class="icon" x1="50" y1="25" x2="68" y2="40"/><line class="icon" x1="50" y1="55" x2="68" y2="40"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 20 32 L 40 12 L 60 32 Z"/><line class="icon" x1="25" y1="55" x2="55" y2="55"/><line class="icon" x1="30" y1="65" x2="50" y2="65"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="point" cx="22" cy="40" r="5"/><line class="icon" x1="12" y1="40" x2="8" y2="40"/><line class="icon" x1="22" y1="30" x2="22" y2="22"/><line class="icon" x1="32" y1="40" x2="36" y2="40"/><line class="icon" x1="22" y1="50" x2="22" y2="58"/><path class="icon" d="M 52 25 Q 68 40 52 55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><line class="icon" x1="15" y1="20" x2="25" y2="20"/><line class="icon" x1="35" y1="20" x2="45" y2="20"/><line class="icon" x1="55" y1="20" x2="65" y2="20"/><path class="icon" d="M 20 50 Q 40 70 60 50"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="icon" cx="22" cy="40" r="12"/><circle class="point" cx="22" cy="40" r="3"/><line class="icon" x1="48" y1="25" x2="48" y2="55"/><line class="icon" x1="58" y1="25" x2="58" y2="55"/><line class="icon" x1="68" y1="25" x2="68" y2="55"/></svg>`
+        ];
 
-// =============================================
-// CONFIG : pièces et blocs noirs fixes
-// Grille 6×10 : indices 0..59, idx = row*6 + col
-// =============================================
-// Placement des blocs noirs : 4 obstacles pour créer des chicanes
-// Positions choisies pour casser la symétrie et forcer des détours
-const BLOCKS = [
-  14, // col 2, row 2
-  21, // col 3, row 3
-  34, // col 4, row 5
-  39, // col 3, row 6
-  44, // col 2, row 7
-];
-
-// Pièces initiales — une de chaque état + quelques white pour remplir
-// Placées en évitant les blocs
-const DEMO = [
-  [1,  'white',      'chevron'],
-  [3,  'white',      'zigzag'],
-  [7,  'silver',     'slash'],
-  [10, 'emerald',    'arc'],
-  [12, 'white',      'triangle'],
-  [16, 'gold',       'arrow'],
-  [19, 'white',      'hook'],
-  [23, 'cosmic',     'triangle'],
-  [27, 'supernovae', 'flag'],
-  [28, 'white',      'chevron'],
-  [31, 'plasma',     'hook'],
-  [37, 'white',      'arc'],
-  [42, 'silver',     'slash'],
-  [46, 'white',      'zigzag'],
-  [50, 'gold',       'arrow'],
-  [53, 'emerald',    'arc'],
-  [55, 'white',      'flag'],
-  [58, 'cosmic',     'triangle'],
-];
-
-let pieces, moves, gearAngles, blocks;
-
-function resetAll() {
-  pieces = new Array(TOTAL).fill(null);
-  blocks = new Set(BLOCKS);
-  for (const [idx, state, icon] of DEMO) {
-    if (!blocks.has(idx)) pieces[idx] = { state, icon };
-  }
-  moves = 0;
-  gearAngles = {};
-  render();
-}
-
-// === HELPERS ===
-function getPos(i) { return { x: i % COLS, y: Math.floor(i / COLS) }; }
-function getIdx(x, y) { return (x<0||x>=COLS||y<0||y>=ROWS) ? -1 : y*COLS+x; }
-function canMove(p) { return p && p.state !== 'white'; }
-function isBlock(i) { return blocks.has(i); }
-// Un bloc noir est un "mur" — bloque comme un bord
-function isBlocked(i) { return i === -1 || blocks.has(i); }
-
-function cardinalNeighbors(idx) {
-  const res = [];
-  if (idx >= COLS) res.push(idx - COLS);
-  if (idx + COLS < TOTAL) res.push(idx + COLS);
-  if (idx % COLS > 0) res.push(idx - 1);
-  if (idx % COLS < COLS - 1) res.push(idx + 1);
-  return res;
-}
-
-function validSwapTargets(srcIdx) {
-  const p = pieces[srcIdx];
-  if (!canMove(p)) return [];
-  const dirs = MOVE_DIRS[p.state];
-  if (!dirs) return [];
-  const { x, y } = getPos(srcIdx);
-  const nb = [];
-  const blockSame = (p.state==='silver'||p.state==='gold'||p.state==='emerald');
-  for (const [dx, dy] of dirs) {
-    const ni = getIdx(x+dx, y+dy);
-    if (ni === -1) continue;
-    if (isBlock(ni)) continue; // bloc noir = infranchissable
-    if (blockSame && pieces[ni] && pieces[ni].state === p.state) continue;
-    nb.push({ ni, dx, dy });
-  }
-  return nb;
-}
-
-// === SWAP ===
-function executeSwap(srcIdx, ni, dx, dy) {
-  const st = pieces[srcIdx]?.state;
-
-  if (st === 'supernovae') {
-    if (pieces[ni]) {
-      const chain = [ni];
-      let cx = getPos(ni).x, cy = getPos(ni).y;
-      while (true) {
-        cx += dx; cy += dy;
-        const next = getIdx(cx, cy);
-        if (next === -1 || isBlock(next) || !pieces[next]) break;
-        chain.push(next);
-      }
-      const lp = getPos(chain[chain.length-1]);
-      const landing = getIdx(lp.x+dx, lp.y+dy);
-      if (landing === -1 || isBlock(landing)) { showToast('Nova bloqué !'); sfx.block(); return false; }
-      for (let i = chain.length-1; i >= 0; i--) {
-        const from = chain[i], fp = getPos(from);
-        const toI = getIdx(fp.x+dx, fp.y+dy);
-        pieces[toI] = pieces[from]; gearAngles[toI] = gearAngles[from] || 0;
-        pieces[from] = null; gearAngles[from] = 0;
-      }
-    }
-    pieces[ni] = pieces[srcIdx]; gearAngles[ni] = gearAngles[srcIdx] || 0;
-    pieces[srcIdx] = null; gearAngles[srcIdx] = 0;
-    sfx.nova();
-  }
-  else if (st === 'plasma') {
-    const { x: sx, y: sy } = getPos(srcIdx);
-    const chainFwd = [];
-    if (pieces[ni]) {
-      chainFwd.push(ni);
-      let cx = getPos(ni).x, cy = getPos(ni).y;
-      while (true) { cx+=dx; cy+=dy; const next=getIdx(cx,cy); if(next===-1||isBlock(next)||!pieces[next])break; chainFwd.push(next); }
-    }
-    const chainBwd = [];
-    let bx = sx-dx, by = sy-dy;
-    while (true) { const next=getIdx(bx,by); if(next===-1||isBlock(next)||!pieces[next])break; chainBwd.push(next); bx-=dx; by-=dy; }
-    if (chainFwd.length > 0) {
-      const lp = getPos(chainFwd[chainFwd.length-1]);
-      const landing = getIdx(lp.x+dx, lp.y+dy);
-      if (landing === -1 || isBlock(landing)) { showToast('Plasma bloqué !'); sfx.block(); return false; }
-    }
-    for (let i = chainFwd.length-1; i >= 0; i--) { const from=chainFwd[i],fp=getPos(from); const toI=getIdx(fp.x+dx,fp.y+dy); pieces[toI]=pieces[from]; gearAngles[toI]=gearAngles[from]||0; pieces[from]=null; gearAngles[from]=0; }
-    pieces[ni] = pieces[srcIdx]; gearAngles[ni] = gearAngles[srcIdx] || 0;
-    pieces[srcIdx] = null; gearAngles[srcIdx] = 0;
-    for (let i = 0; i < chainBwd.length; i++) { const from=chainBwd[i],fp=getPos(from); const toI=getIdx(fp.x+dx,fp.y+dy); pieces[toI]=pieces[from]; gearAngles[toI]=gearAngles[from]||0; pieces[from]=null; gearAngles[from]=0; }
-    sfx.plasma();
-  }
-  else {
-    const tmp = pieces[srcIdx]; pieces[srcIdx] = pieces[ni]; pieces[ni] = tmp;
-    const ta = gearAngles[srcIdx] || 0; gearAngles[srcIdx] = gearAngles[ni] || 0; gearAngles[ni] = ta;
-    sfx.swap(st);
-  }
-  return true;
-}
-
-// === RENDU ===
-function render() {
-  const grid = document.getElementById('grid');
-  grid.innerHTML = '';
-  let count = 0;
-  for (let i = 0; i < TOTAL; i++) {
-    const col = i % COLS, row = Math.floor(i / COLS);
-    const cell = document.createElement('div');
-    cell.className = 'cell';
-    cell.style.left = `calc(${col} * var(--ct))`;
-    cell.style.top = `calc(${row} * var(--ct))`;
-    const sq = document.createElement('div');
-    sq.dataset.index = i;
-    if (blocks.has(i)) {
-      sq.className = 'square block';
-    } else if (pieces[i]) {
-      count++;
-      sq.className = 'square ' + pieces[i].state;
-      sq.innerHTML = '<svg viewBox="0 0 52 52" fill="none">' + (ICONS[pieces[i].icon]||'') + '</svg>';
-      const a = gearAngles[i] || 0;
-      if (a) cell.style.transform = 'rotate('+a+'deg)';
-    } else {
-      sq.className = 'square empty';
-    }
-    cell.appendChild(sq);
-    grid.appendChild(cell);
-  }
-  document.getElementById('stat-pieces').textContent = count;
-  document.getElementById('stat-moves').textContent = moves;
-}
-
-// =============================================
-// ENGRENAGE v7 : propagation BFS stoppée par le vide ET par les blocs noirs
-// =============================================
-function getDir(fromIdx, toIdx) {
-  var fp = getPos(fromIdx), tp = getPos(toIdx);
-  if (tp.y < fp.y) return [0, -4];
-  if (tp.y > fp.y) return [0,  4];
-  if (tp.x < fp.x) return [-4, 0];
-  if (tp.x > fp.x) return [ 4, 0];
-  return [0, 0];
-}
-
-function doGearClick(clickedIdx) {
-  if (!pieces[clickedIdx]) return 0;
-
-  var plan = [];
-  var visited = new Set();
-  var queue = [{ idx: clickedIdx, sens: 1, depth: 0, fromIdx: clickedIdx }];
-  visited.add(clickedIdx);
-
-  while (queue.length > 0) {
-    var cur = queue.shift();
-    plan.push(cur);
-    var neighbors = cardinalNeighbors(cur.idx);
-    for (var n = 0; n < neighbors.length; n++) {
-      var ni = neighbors[n];
-      // Un bloc noir stoppe la propagation comme le ferait le vide
-      if (!visited.has(ni) && !isBlock(ni) && pieces[ni]) {
-        visited.add(ni);
-        queue.push({ idx: ni, sens: -cur.sens, depth: cur.depth + 1, fromIdx: cur.idx });
-      }
-    }
-  }
-
-  for (var p = 0; p < plan.length; p++) {
-    if (!gearAngles[plan[p].idx]) gearAngles[plan[p].idx] = 0;
-    gearAngles[plan[p].idx] += plan[p].sens * 90;
-  }
-
-  var maxDelay = 0;
-  var chainSize = plan.length;
-  for (var p = 0; p < plan.length; p++) {
-    var item = plan[p];
-    var delay = item.depth * 120;
-    if (delay + 1000 > maxDelay) maxDelay = delay + 1000;
-
-    // Son échelonné selon profondeur
-    (function(item, delay) {
-      setTimeout(function() { sfx.gear(item.depth, chainSize); }, delay);
-    })(item, delay);
-
-    (function(item, delay) {
-      var el = document.querySelector('[data-index="'+item.idx+'"]');
-      if (!el) return;
-      var cell = el.parentElement;
-      if (!cell) return;
-
-      var prevAngle = gearAngles[item.idx] - item.sens * 90;
-      var targetAngle = gearAngles[item.idx];
-      var dir = getDir(item.fromIdx, item.idx);
-      var tx = dir[0], ty = dir[1];
-      if (item.depth === 0) { tx = 0; ty = 0; }
-
-      setTimeout(function() {
-        cell.style.transition = 'transform 0.15s ease-in';
-        cell.style.transform = 'rotate('+prevAngle+'deg) translate('+tx+'px, '+ty+'px) scale(0.78)';
-
-        setTimeout(function() {
-          cell.style.transition = 'transform 0.85s cubic-bezier(0.34, 1.3, 0.64, 1)';
-          cell.style.transform = 'rotate('+targetAngle+'deg) translate(0, 0) scale(1)';
-        }, 150);
-      }, delay);
-    })(item, delay);
-  }
-
-  return maxDelay + 100;
-}
-
-// =============================================
-// SON : Tone.js — palette minimaliste, dans l'esprit KANNA
-// =============================================
-var soundOn = true;
-var soundReady = false;
-
-// Synths — créés à la 1ère interaction (politique autoplay iOS)
-var synths = null;
-function initSound() {
-  if (soundReady) return;
-  try {
-    Tone.start();
-    synths = {
-      // Click engrenage : pulse doux, pitch qui descend avec la profondeur
-      gear: new Tone.Synth({
-        oscillator: { type: 'sine' },
-        envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 }
-      }).toDestination(),
-      // Swap standard : note courte selon l'état
-      swap: new Tone.Synth({
-        oscillator: { type: 'triangle' },
-        envelope: { attack: 0.002, decay: 0.12, sustain: 0, release: 0.08 }
-      }).toDestination(),
-      // Nova : deux notes montantes
-      nova: new Tone.Synth({
-        oscillator: { type: 'sawtooth' },
-        envelope: { attack: 0.005, decay: 0.15, sustain: 0, release: 0.1 }
-      }).toDestination(),
-      // Plasma : note basse qui bat
-      plasma: new Tone.MembraneSynth({
-        pitchDecay: 0.05, octaves: 4,
-        envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.2 }
-      }).toDestination(),
-      // Blocage : note dissonante courte
-      block: new Tone.Synth({
-        oscillator: { type: 'square' },
-        envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.05 }
-      }).toDestination(),
-    };
-    synths.gear.volume.value = -18;
-    synths.swap.volume.value = -14;
-    synths.nova.volume.value = -16;
-    synths.plasma.volume.value = -12;
-    synths.block.volume.value = -20;
-    soundReady = true;
-  } catch(e) { console.warn('Sound init failed', e); }
-}
-
-// Gamme pentatonique C# — jamais dissonant, toujours doux
-var PENTA = ['C#4','D#4','F#4','G#4','A#4','C#5','D#5','F#5','G#5','A#5'];
-// Notes spécifiques par état pour le swap
-var STATE_NOTES = {
-  silver:     'C#5',
-  gold:       'E5',
-  emerald:    'G#4',
-  cosmic:     'A#5',
-  supernovae: 'F#5',
-  plasma:     'C#4',
-};
-
-var sfx = {
-  gear: function(depth, chainSize) {
-    if (!soundOn || !soundReady) return;
-    // Pitch descend avec la profondeur, accorde dans la penta
-    var idx = Math.min(PENTA.length - 1, depth);
-    var note = PENTA[PENTA.length - 1 - idx]; // inversé : profond = grave
-    try { synths.gear.triggerAttackRelease(note, '16n'); } catch(e){}
-  },
-  swap: function(state) {
-    if (!soundOn || !soundReady) return;
-    var note = STATE_NOTES[state] || 'C#5';
-    try { synths.swap.triggerAttackRelease(note, '8n'); } catch(e){}
-  },
-  nova: function() {
-    if (!soundOn || !soundReady) return;
-    try {
-      synths.nova.triggerAttackRelease('C#5', '16n');
-      setTimeout(function(){ try{ synths.nova.triggerAttackRelease('G#5','16n'); }catch(e){} }, 80);
-    } catch(e){}
-  },
-  plasma: function() {
-    if (!soundOn || !soundReady) return;
-    try { synths.plasma.triggerAttackRelease('C#2', '8n'); } catch(e){}
-  },
-  block: function() {
-    if (!soundOn || !soundReady) return;
-    try { synths.block.triggerAttackRelease('C#3', '32n'); } catch(e){}
-  },
-};
-
-function toggleSound() {
-  soundOn = !soundOn;
-  var btn = document.getElementById('sound-btn');
-  if (soundOn) { btn.classList.remove('off'); btn.textContent = '♪'; }
-  else { btn.classList.add('off'); btn.textContent = '♪̶'; }
-}
-
-// =============================================
-// INTERACTION : click vs swipe
-// =============================================
-let busy = false;
-let pointerDown = null;
-
-function onDown(e) {
-  if (busy) return;
-  initSound(); // démarre l'audio au 1er touch
-  const sq = e.target.closest('.square');
-  if (!sq || sq.classList.contains('empty') || sq.classList.contains('block')) return;
-  const idx = parseInt(sq.dataset.index);
-  if (isNaN(idx) || !pieces[idx]) return;
-  e.preventDefault();
-
-  const cx = e.touches ? e.touches[0].clientX : e.clientX;
-  const cy = e.touches ? e.touches[0].clientY : e.clientY;
-  pointerDown = { idx, x: cx, y: cy, time: Date.now(), moved: false, done: false };
-}
-
-function onMove(e) {
-  if (!pointerDown || pointerDown.done || busy) return;
-  const cx = e.touches ? e.touches[0].clientX : e.clientX;
-  const cy = e.touches ? e.touches[0].clientY : e.clientY;
-  const dx = cx - pointerDown.x;
-  const dy = cy - pointerDown.y;
-  const dist = Math.sqrt(dx*dx + dy*dy);
-
-  if (dist > 15) {
-    pointerDown.moved = true;
-    e.preventDefault();
-
-    if (!canMove(pieces[pointerDown.idx])) {
-      pointerDown.done = true;
-      pointerDown = null;
-      return;
-    }
-
-    const targets = validSwapTargets(pointerDown.idx);
-    let best = null, bestS = -1;
-    for (const t of targets) {
-      const s = t.dx * dx + t.dy * dy;
-      if (s > bestS) { bestS = s; best = t; }
-    }
-
-    if (!best || bestS < 5) {
-      pointerDown.done = true;
-      pointerDown = null;
-      return;
-    }
-
-    pointerDown.done = true;
-    busy = true;
-
-    var srcIdx = pointerDown.idx;
-    var ni = best.ni, bdx = best.dx, bdy = best.dy;
-    var srcCell = document.querySelector('[data-index="'+srcIdx+'"]');
-    if (srcCell) srcCell = srcCell.parentElement;
-    var dstCell = document.querySelector('[data-index="'+ni+'"]');
-    if (dstCell) dstCell = dstCell.parentElement;
-
-    // Lire la taille de cellule dynamique
-    var ct = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ct'));
-
-    var sp = getPos(srcIdx), dp = getPos(ni);
-    var slideDur = 500;
-
-    if (srcCell) {
-      srcCell.style.transition = 'left '+slideDur+'ms cubic-bezier(0.4,0,0.2,1), top '+slideDur+'ms cubic-bezier(0.4,0,0.2,1)';
-      srcCell.style.zIndex = '10';
-      srcCell.style.left = (dp.x * ct) + 'px';
-      srcCell.style.top = (dp.y * ct) + 'px';
-    }
-    var srcState = pieces[srcIdx] ? pieces[srcIdx].state : '';
-    if (srcState !== 'supernovae' && srcState !== 'plasma' && dstCell && pieces[ni]) {
-      dstCell.style.transition = 'left '+slideDur+'ms cubic-bezier(0.4,0,0.2,1), top '+slideDur+'ms cubic-bezier(0.4,0,0.2,1)';
-      dstCell.style.left = (sp.x * ct) + 'px';
-      dstCell.style.top = (sp.y * ct) + 'px';
-    }
-    if (srcState === 'supernovae' && pieces[ni]) {
-      var chain = [ni]; var cx2 = dp.x, cy2 = dp.y;
-      while (true) { cx2+=bdx; cy2+=bdy; var next=getIdx(cx2,cy2); if(next===-1||isBlock(next)||!pieces[next])break; chain.push(next); }
-      for (var ci = 0; ci < chain.length; ci++) {
-        var cc = document.querySelector('[data-index="'+chain[ci]+'"]');
-        if (cc) cc = cc.parentElement;
-        if (cc) {
-          var cp = getPos(chain[ci]);
-          cc.style.transition = 'left '+slideDur+'ms cubic-bezier(0.4,0,0.2,1), top '+slideDur+'ms cubic-bezier(0.4,0,0.2,1)';
-          cc.style.left = ((cp.x+bdx) * ct) + 'px';
-          cc.style.top = ((cp.y+bdy) * ct) + 'px';
+        // ========== FAMILLES ==========
+        // Tirer aléatoirement 7 silver, 6 gold, 5 cosmic (sans doublon)
+        const allIndices = Array.from({length: 50}, (_, i) => i);
+        for (let i = allIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allIndices[i], allIndices[j]] = [allIndices[j], allIndices[i]];
         }
-      }
-    }
-    if (srcState === 'plasma') {
-      var chainFwd = [], chainBwd = [];
-      if (pieces[ni]) {
-        chainFwd.push(ni); var cx2=dp.x,cy2=dp.y;
-        while(true){cx2+=bdx;cy2+=bdy;var next=getIdx(cx2,cy2);if(next===-1||isBlock(next)||!pieces[next])break;chainFwd.push(next);}
-      }
-      var bx=sp.x-bdx,by=sp.y-bdy;
-      while(true){var next=getIdx(bx,by);if(next===-1||isBlock(next)||!pieces[next])break;chainBwd.push(next);bx-=bdx;by-=bdy;}
-      for (var ci=0;ci<chainFwd.length;ci++){
-        var cc=document.querySelector('[data-index="'+chainFwd[ci]+'"]');if(cc)cc=cc.parentElement;
-        if(cc){var cp=getPos(chainFwd[ci]);cc.style.transition='left '+slideDur+'ms cubic-bezier(0.4,0,0.2,1), top '+slideDur+'ms cubic-bezier(0.4,0,0.2,1)';cc.style.left=((cp.x+bdx)*ct)+'px';cc.style.top=((cp.y+bdy)*ct)+'px';}
-      }
-      for (var ci=0;ci<chainBwd.length;ci++){
-        var cc=document.querySelector('[data-index="'+chainBwd[ci]+'"]');if(cc)cc=cc.parentElement;
-        if(cc){var cp=getPos(chainBwd[ci]);cc.style.transition='left '+slideDur+'ms cubic-bezier(0.4,0,0.2,1), top '+slideDur+'ms cubic-bezier(0.4,0,0.2,1)';cc.style.left=((cp.x+bdx)*ct)+'px';cc.style.top=((cp.y+bdy)*ct)+'px';}
-      }
-    }
 
-    pointerDown = null;
-    setTimeout(function() {
-      var ok = executeSwap(srcIdx, ni, bdx, bdy);
-      if (ok) moves++;
-      render();
-      busy = false;
-    }, slideDur + 50);
-  }
-}
+        const families = {}; // tileIndex -> 'silver' | 'gold' | 'cosmic'
+        const silverSet = new Set(allIndices.slice(0, 7));
+        const goldSet = new Set(allIndices.slice(7, 13));
+        const cosmicSet = new Set(allIndices.slice(13, 18));
 
-function onUp(e) {
-  if (!pointerDown || pointerDown.done || busy) { pointerDown = null; return; }
+        silverSet.forEach(i => families[i] = 'silver');
+        goldSet.forEach(i => families[i] = 'gold');
+        cosmicSet.forEach(i => families[i] = 'cosmic');
 
-  const elapsed = Date.now() - pointerDown.time;
+        // ========== GRILLE ==========
+        let grid = [];
+        for (let r = 0; r < ROWS; r++) {
+            grid[r] = [];
+            for (let c = 0; c < COLS; c++) {
+                grid[r][c] = r * COLS + c;
+            }
+        }
 
-  if (!pointerDown.moved && elapsed < 500) {
-    const idx = pointerDown.idx;
-    pointerDown = null;
+        const container = document.getElementById('gridContainer');
+        let tileElements = [];
 
-    if (!pieces[idx]) return;
+        for (let i = 0; i < 50; i++) {
+            const tile = document.createElement('div');
+            tile.className = 'square';
+            if (families[i]) tile.classList.add(families[i]);
+            tile.innerHTML = tilesData[i];
+            tile.dataset.index = i;
+            container.appendChild(tile);
+            tileElements.push(tile);
+        }
 
-    busy = true;
-    moves++;
-    const dur = doGearClick(idx);
-    setTimeout(function() { busy = false; }, dur);
-  } else {
-    pointerDown = null;
-  }
-}
+        function updateAllPositions() {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const ti = grid[r][c];
+                    const tile = tileElements[ti];
+                    tile.style.transition = 'none';
+                    tile.style.left = (c * CELL_TOTAL) + 'px';
+                    tile.style.top = (r * CELL_TOTAL) + 'px';
+                }
+            }
+        }
+        updateAllPositions();
 
-// === TOAST ===
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(function() { t.classList.remove('show'); }, 1200);
-}
+        // ========== DRAG ==========
+        let isDragging = false;
+        let dragStartX = 0, dragStartY = 0;
+        let dragAxis = null;
+        let dragFamily = null;
+        let moveCount = 0;
+        let isAnimating = false;
 
-// === LÉGENDE ===
-function buildLegend() {
-  var items = [
-    { label:'White', dir:'⚙', color:'rgba(180,180,190,0.5)' },
-    { label:'Silver', dir:'← →', color:'#22d3ee' },
-    { label:'Gold', dir:'✕', color:'#ffd700' },
-    { label:'Emerald', dir:'↑ ↓', color:'#34d399' },
-    { label:'Cosmic', dir:'8d', color:'#c4b5fd' },
-    { label:'Nova', dir:'push', color:'#ffa014' },
-    { label:'Plasma', dir:'±', color:'#ff2060' },
-    { label:'Bloc', dir:'■', color:'#000' },
-  ];
-  document.getElementById('legend').innerHTML = items.map(function(i) {
-    return '<div class="legend-item"><div class="legend-dot" style="background:'+i.color+';border:1px solid rgba(255,255,255,0.1)"></div>'+i.label+' <span class="legend-dir">'+i.dir+'</span></div>';
-  }).join('');
-}
+        function findPos(tileIndex) {
+            for (let r = 0; r < ROWS; r++)
+                for (let c = 0; c < COLS; c++)
+                    if (grid[r][c] === tileIndex) return { r, c };
+            return null;
+        }
 
-// === EVENTS ===
-document.addEventListener('mousedown', onDown);
-document.addEventListener('mousemove', onMove);
-document.addEventListener('mouseup', onUp);
-document.addEventListener('touchstart', onDown, { passive: false });
-document.addEventListener('touchmove', onMove, { passive: false });
-document.addEventListener('touchend', onUp);
+        function getFamilySet(family) {
+            if (family === 'silver') return silverSet;
+            if (family === 'gold') return goldSet;
+            if (family === 'cosmic') return cosmicSet;
+            return null;
+        }
 
-// === INIT ===
-resetAll();
-buildLegend();
-</script>
+        function startDrag(e) {
+            if (isAnimating) return;
+            const tile = e.target.closest('.square');
+            if (!tile) return;
+
+            const ti = parseInt(tile.dataset.index);
+            const family = families[ti];
+            if (!family) return; // seules les tuiles colorées sont draggables
+
+            e.preventDefault();
+            isDragging = true;
+            dragAxis = null;
+            dragFamily = family;
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            dragStartX = clientX;
+            dragStartY = clientY;
+        }
+
+        function moveDrag(e) {
+            if (!isDragging || dragAxis !== null) return;
+            e.preventDefault();
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const dx = clientX - dragStartX;
+            const dy = clientY - dragStartY;
+
+            const threshold = 20;
+            if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    dragAxis = dx > 0 ? 'right' : 'left';
+                } else {
+                    dragAxis = dy > 0 ? 'down' : 'up';
+                }
+                executeGroupMove(dragFamily, dragAxis);
+            }
+        }
+
+        function endDrag() {
+            isDragging = false;
+            dragAxis = null;
+            dragFamily = null;
+        }
+
+        function executeGroupMove(family, direction) {
+            isAnimating = true;
+
+            const deltas = {
+                'up':    { dr: -1, dc: 0 },
+                'down':  { dr: 1,  dc: 0 },
+                'left':  { dr: 0,  dc: -1 },
+                'right': { dr: 0,  dc: 1 }
+            };
+            const { dr, dc } = deltas[direction];
+            const familySet = getFamilySet(family);
+
+            // Snapshot de la grille actuelle
+            const oldGrid = grid.map(row => [...row]);
+
+            // Positions actuelles des membres
+            const targets = [];
+            for (const ti of familySet) {
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        if (oldGrid[r][c] === ti) {
+                            targets.push({
+                                tileIndex: ti,
+                                fromR: r, fromC: c,
+                                toR: ((r + dr) % ROWS + ROWS) % ROWS,
+                                toC: ((c + dc) % COLS + COLS) % COLS
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Set des cases cibles de la famille
+            const targetKeys = new Set(targets.map(t => t.toR + ',' + t.toC));
+
+            // Non-famille qui se trouvent sur une case cible : ils doivent bouger
+            // Chaque non-famille va à la source DU MEMBRE QUI ARRIVE sur sa case
+            const swaps = [];
+            for (const t of targets) {
+                const occupant = oldGrid[t.toR][t.toC];
+                if (!familySet.has(occupant)) {
+                    // Ce non-famille est poussé par ce membre précis
+                    // Il va à la source de CE membre
+                    swaps.push({ normalTile: occupant, toR: t.fromR, toC: t.fromC });
+                }
+            }
+
+            // Mais attention : si la source de ce membre est AUSSI une case cible
+            // d'un autre membre, alors il y a conflit.
+            // Dans ce cas, il faut chaîner : le non-famille va à la source du membre
+            // dont la cible est cette source, etc.
+            // 
+            // Simplifions : on sait que le nombre de cases libérées (sources non-cibles)
+            // = le nombre de non-famille déplacés.
+            // On construit la chaîne : pour chaque non-famille, on suit la chaîne
+            // de sources jusqu'à trouver une source qui n'est pas une cible.
+
+            // Map : cible -> source pour les membres
+            const targetToSource = {};
+            for (const t of targets) {
+                targetToSource[t.toR + ',' + t.toC] = { r: t.fromR, c: t.fromC };
+            }
+
+            // Pour chaque swap, suivre la chaîne
+            for (const s of swaps) {
+                let destR = s.toR;
+                let destC = s.toC;
+                let key = destR + ',' + destC;
+                // Tant que la destination est aussi une case cible d'un membre,
+                // on suit vers la source de ce membre
+                while (targetKeys.has(key)) {
+                    const src = targetToSource[key];
+                    destR = src.r;
+                    destC = src.c;
+                    key = destR + ',' + destC;
+                }
+                s.toR = destR;
+                s.toC = destC;
+            }
+
+            // Construire la nouvelle grille
+            const newGrid = oldGrid.map(row => [...row]);
+
+            // Effacer toutes les positions sources des membres
+            for (const t of targets) {
+                newGrid[t.fromR][t.fromC] = -99;
+            }
+
+            // Placer les membres à leurs cibles
+            for (const t of targets) {
+                newGrid[t.toR][t.toC] = t.tileIndex;
+            }
+
+            // Placer les non-famille à leurs destinations chaînées
+            for (const s of swaps) {
+                newGrid[s.toR][s.toC] = s.normalTile;
+            }
+
+            // Vérification
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (newGrid[r][c] === -99 || newGrid[r][c] < 0) {
+                        console.error('BUG: case non remplie à', r, c);
+                        isAnimating = false;
+                        return;
+                    }
+                }
+            }
+
+            grid = newGrid;
+            animateMove(targets, swaps, dr, dc);
+
+            moveCount++;
+            document.getElementById('moveCount').textContent = moveCount;
+        }
+
+        function animateMove(targets, swaps, dr, dc) {
+            const pxX = dc * CELL_TOTAL;
+            const pxY = dr * CELL_TOTAL;
+
+            for (const t of targets) {
+                const tile = tileElements[t.tileIndex];
+                const targetLeft = t.toC * CELL_TOTAL;
+                const targetTop = t.toR * CELL_TOTAL;
+                const isWrap = Math.abs(t.toC - t.fromC) > 1 || Math.abs(t.toR - t.fromR) > 1;
+
+                if (isWrap) {
+                    const exitLeft = t.fromC * CELL_TOTAL + pxX;
+                    const exitTop = t.fromR * CELL_TOTAL + pxY;
+                    tile.style.transition = 'left 0.15s ease-out, top 0.15s ease-out';
+                    tile.style.left = exitLeft + 'px';
+                    tile.style.top = exitTop + 'px';
+                    setTimeout(() => {
+                        tile.style.transition = 'none';
+                        tile.style.left = targetLeft + 'px';
+                        tile.style.top = targetTop + 'px';
+                    }, 160);
+                } else {
+                    tile.style.transition = 'left 0.15s ease-out, top 0.15s ease-out';
+                    tile.style.left = targetLeft + 'px';
+                    tile.style.top = targetTop + 'px';
+                }
+            }
+
+            for (const s of swaps) {
+                const tile = tileElements[s.normalTile];
+                tile.style.transition = 'left 0.15s ease-out, top 0.15s ease-out';
+                tile.style.left = (s.toC * CELL_TOTAL) + 'px';
+                tile.style.top = (s.toR * CELL_TOTAL) + 'px';
+            }
+
+            setTimeout(() => {
+                updateAllPositions();
+                isAnimating = false;
+            }, 200);
+        }
+
+        // Events
+        container.addEventListener('mousedown', startDrag);
+        container.addEventListener('touchstart', startDrag, { passive: false });
+        document.addEventListener('mousemove', moveDrag);
+        document.addEventListener('touchmove', moveDrag, { passive: false });
+        document.addEventListener('mouseup', endDrag);
+        document.addEventListener('touchend', endDrag);
+    </script>
 </body>
 </html>
