@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>KANNA - Silver Gold Cosmic v2</title>
     <style>
+        :root {
+            --cell-size: 80px;
+            --gap: 10px;
+            --cell-total: 90px;
+            --radius: 14px;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { height: 100%; overflow: hidden; touch-action: none; }
 
@@ -15,14 +21,14 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 8px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
         .grid-wrapper {
             position: relative;
-            width: 890px;
-            height: 440px;
+            width: calc(var(--cell-total) * 10);
+            height: calc(var(--cell-total) * 5);
             overflow: hidden;
         }
 
@@ -33,10 +39,10 @@
         }
 
         .square {
-            width: 80px; height: 80px;
+            width: var(--cell-size); height: var(--cell-size);
             background-color: #12131a;
             border: 1px solid rgba(180, 180, 190, 0.35);
-            border-radius: 14px;
+            border-radius: var(--radius);
             position: absolute;
             overflow: hidden;
             cursor: grab;
@@ -117,11 +123,13 @@
         /* ========== INFO ========== */
         .move-counter {
             color: rgba(180, 180, 190, 0.5);
-            font-size: 13px;
-            letter-spacing: 0.1em;
-            margin-bottom: 12px;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
             display: flex;
-            gap: 20px;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
         .move-counter .silver-label { color: #7ec8e3; }
         .move-counter .gold-label { color: #ffd700; }
@@ -142,13 +150,36 @@
     </div>
 
     <script>
+        // ========== RESPONSIVE ==========
+        function computeSizes() {
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const pad = 16;
+            const headerH = 30; // espace pour le compteur
+
+            const availW = vw - pad;
+            const availH = vh - pad - headerH;
+
+            // 10 cellules + 10 gaps en largeur, 5 cellules + 5 gaps en hauteur
+            const cellFromW = Math.floor((availW) / 10.5);
+            const cellFromH = Math.floor((availH) / 5.5);
+            const cellSize = Math.min(cellFromW, cellFromH, 80); // max 80 comme avant
+            const gap = Math.max(2, Math.round(cellSize * 0.08));
+            const radius = Math.max(4, Math.round(cellSize * 0.15));
+
+            document.documentElement.style.setProperty('--cell-size', cellSize + 'px');
+            document.documentElement.style.setProperty('--gap', gap + 'px');
+            document.documentElement.style.setProperty('--cell-total', (cellSize + gap) + 'px');
+            document.documentElement.style.setProperty('--radius', radius + 'px');
+
+            return { cellSize, gap, cellTotal: cellSize + gap };
+        }
+        let sizes = computeSizes();
+
         const COLS = 10;
         const ROWS = 5;
-        const CELL_SIZE = 80;
-        const GAP = 10;
-        const CELL_TOTAL = CELL_SIZE + GAP;
-        const GRID_WIDTH = COLS * CELL_TOTAL;
-        const GRID_HEIGHT = ROWS * CELL_TOTAL;
+        // Getters dynamiques
+        function getCellTotal() { return sizes.cellTotal; }
 
         const tilesData = [
             `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 12 22 L 22 35 L 32 22"/><path class="icon" d="M 48 58 L 58 45 L 68 58"/></svg>`,
@@ -248,8 +279,8 @@
                     const ti = grid[r][c];
                     const tile = tileElements[ti];
                     tile.style.transition = 'none';
-                    tile.style.left = (c * CELL_TOTAL) + 'px';
-                    tile.style.top = (r * CELL_TOTAL) + 'px';
+                    tile.style.left = (c * getCellTotal()) + 'px';
+                    tile.style.top = (r * getCellTotal()) + 'px';
                 }
             }
         }
@@ -440,18 +471,18 @@
         }
 
         function animateMove(targets, swaps, dr, dc) {
-            const pxX = dc * CELL_TOTAL;
-            const pxY = dr * CELL_TOTAL;
+            const pxX = dc * getCellTotal();
+            const pxY = dr * getCellTotal();
 
             for (const t of targets) {
                 const tile = tileElements[t.tileIndex];
-                const targetLeft = t.toC * CELL_TOTAL;
-                const targetTop = t.toR * CELL_TOTAL;
+                const targetLeft = t.toC * getCellTotal();
+                const targetTop = t.toR * getCellTotal();
                 const isWrap = Math.abs(t.toC - t.fromC) > 1 || Math.abs(t.toR - t.fromR) > 1;
 
                 if (isWrap) {
-                    const exitLeft = t.fromC * CELL_TOTAL + pxX;
-                    const exitTop = t.fromR * CELL_TOTAL + pxY;
+                    const exitLeft = t.fromC * getCellTotal() + pxX;
+                    const exitTop = t.fromR * getCellTotal() + pxY;
                     tile.style.transition = 'left 0.15s ease-out, top 0.15s ease-out';
                     tile.style.left = exitLeft + 'px';
                     tile.style.top = exitTop + 'px';
@@ -470,8 +501,8 @@
             for (const s of swaps) {
                 const tile = tileElements[s.normalTile];
                 tile.style.transition = 'left 0.15s ease-out, top 0.15s ease-out';
-                tile.style.left = (s.toC * CELL_TOTAL) + 'px';
-                tile.style.top = (s.toR * CELL_TOTAL) + 'px';
+                tile.style.left = (s.toC * getCellTotal()) + 'px';
+                tile.style.top = (s.toR * getCellTotal()) + 'px';
             }
 
             setTimeout(() => {
@@ -487,6 +518,11 @@
         document.addEventListener('touchmove', moveDrag, { passive: false });
         document.addEventListener('mouseup', endDrag);
         document.addEventListener('touchend', endDrag);
+        // Resize handler
+        window.addEventListener('resize', () => {
+            sizes = computeSizes();
+            updateAllPositions();
+        });
     </script>
 </body>
 </html>
