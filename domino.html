@@ -267,7 +267,7 @@
             const tile = document.createElement('div');
             tile.className = 'square';
             if (families[i]) tile.classList.add(families[i]);
-            tile.innerHTML = tilesData[i];
+            tile.innerHTML = '';
             tile.dataset.index = i;
             container.appendChild(tile);
             tileElements.push(tile);
@@ -294,6 +294,13 @@
         let moveCount = 0;
         let isAnimating = false;
 
+        // ========== COLUMN DRAG (case noire) ==========
+        let isColumnDragging = false;
+        let columnDragIndex = -1;      // index de la colonne d'origine sélectionnée
+        let columnDragStartX = 0;       // position initiale du curseur
+        let columnDragOffset = 0;       // décalage actuel en px
+        let columnLiveShift = 0;        // nb de cases dépassées (entier signé)
+
         function findPos(tileIndex) {
             for (let r = 0; r < ROWS; r++)
                 for (let c = 0; c < COLS; c++)
@@ -315,20 +322,52 @@
 
             const ti = parseInt(tile.dataset.index);
             const family = families[ti];
-            if (!family) return; // seules les tuiles colorées sont draggables
 
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            // Case noire => column drag
+            if (!family) {
+                e.preventDefault();
+                const pos = findPos(ti);
+                if (!pos) return;
+                isColumnDragging = true;
+                columnDragIndex = pos.c;
+                columnDragStartX = clientX;
+                columnDragOffset = 0;
+                columnLiveShift = 0;
+                // Élever toutes les tuiles de la colonne draguée au-dessus
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        const t = tileElements[grid[r][c]];
+                        t.style.transition = 'none';
+                        if (c === columnDragIndex) {
+                            t.style.zIndex = '10';
+                        }
+                    }
+                }
+                return;
+            }
+
+            // Case colorée => comportement famille existant
             e.preventDefault();
             isDragging = true;
             dragAxis = null;
             dragFamily = family;
-
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             dragStartX = clientX;
             dragStartY = clientY;
         }
 
         function moveDrag(e) {
+            // Column drag : suivi pixel-perfect
+            if (isColumnDragging) {
+                e.preventDefault();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                columnDragOffset = clientX - columnDragStartX;
+                renderColumnDrag();
+                return;
+            }
+
             if (!isDragging || dragAxis !== null) return;
             e.preventDefault();
 
@@ -349,9 +388,135 @@
         }
 
         function endDrag() {
+            if (isColumnDragging) {
+                finishColumnDrag();
+                return;
+            }
             isDragging = false;
             dragAxis = null;
             dragFamily = null;
+        }
+
+        // ========== COLUMN DRAG : rendu fluide + snap ==========
+        function renderColumnDrag() {
+            const cellTotal = getCellTotal();
+            const fromCol = columnDragIndex;
+
+            // Limites : on borne le drag pour qu'il reste dans la grille (pas de wrap)
+            const minOffset = -fromCol * cellTotal;                // colonne 0 max à gauche
+            const maxOffset = (COLS - 1 - fromCol) * cellTotal;    // colonne COLS-1 max à droite
+            if (columnDragOffset < minOffset) columnDragOffset = minOffset;
+            if (columnDragOffset > maxOffset) columnDragOffset = maxOffset;
+
+            // Calcul du nb de cases dépassées : on bascule à la moitié d'une case
+            const newShift = Math.round(columnDragOffset / cellTotal);
+
+            // 1) La colonne draguée suit le doigt en pixel-perfect
+            for (let r = 0; r < ROWS; r++) {
+                const tile = tileElements[grid[r][fromCol]];
+                tile.style.transition = 'none';
+                tile.style.left = (fromCol * cellTotal + columnDragOffset) + 'px';
+            }
+
+            // 2) Si le shift live a changé, on anime les colonnes concernées vers leurs nouvelles positions
+            if (newShift !== columnLiveShift) {
+                // Pour chaque colonne d'origine c (≠ fromCol), sa position visuelle dépend du shift courant :
+                //   - si c est entre fromCol+1 et fromCol+newShift (newShift>0) : elle se décale de -1 (vers fromCol)
+                //   - si c est entre fromCol+newShift et fromCol-1 (newShift<0) : elle se décale de +1
+                //   - sinon : elle reste à sa position d'origine c
+                // On recalcule la position visuelle de TOUTES les colonnes non-draguées et on anime.
+                for (let c = 0; c < COLS; c++) {
+                    if (c === fromCol) continue;
+                    const visualC = computeVisualCol(c, fromCol, newShift);
+                    for (let r = 0; r < ROWS; r++) {
+                        const tile = tileElements[grid[r][c]];
+                        tile.style.transition = 'left 0.18s ease-out';
+                        tile.style.left = (visualC * cellTotal) + 'px';
+                    }
+                }
+                columnLiveShift = newShift;
+            }
+        }
+
+        // Calcule où la colonne d'origine `c` doit visuellement se trouver
+        // quand la colonne draguée `fromCol` a un shift de `shift` cases.
+        function computeVisualCol(c, fromCol, shift) {
+            if (shift > 0) {
+                // Draguée va vers la droite : colonnes entre fromCol+1 et fromCol+shift se décalent de -1
+                if (c > fromCol && c <= fromCol + shift) return c - 1;
+                return c;
+            } else if (shift < 0) {
+                // Draguée va vers la gauche : colonnes entre fromCol+shift et fromCol-1 se décalent de +1
+                if (c >= fromCol + shift && c < fromCol) return c + 1;
+                return c;
+            }
+            return c;
+        }
+
+        function finishColumnDrag() {
+            const cellTotal = getCellTotal();
+            const fromCol = columnDragIndex;
+            const shift = columnLiveShift;
+            const toCol = fromCol + shift;
+
+            isAnimating = true;
+
+            // Snap : la colonne draguée glisse vers sa position cible (toCol)
+            for (let r = 0; r < ROWS; r++) {
+                const tile = tileElements[grid[r][fromCol]];
+                tile.style.transition = 'left 0.15s ease-out';
+                tile.style.left = (toCol * cellTotal) + 'px';
+            }
+
+            // Les autres colonnes sont déjà à leur position visuelle correcte (animées en live).
+            // On les laisse, juste on s'assure qu'elles ont une transition propre.
+
+            // Mise à jour de la grille logique
+            if (shift !== 0) {
+                const newGrid = grid.map(row => [...row]);
+                // Sauvegarder la colonne draguée
+                const draggedCol = [];
+                for (let r = 0; r < ROWS; r++) draggedCol.push(grid[r][fromCol]);
+
+                // Décaler les colonnes intermédiaires
+                if (shift > 0) {
+                    // colonnes fromCol+1 .. fromCol+shift reculent de 1 vers la gauche
+                    for (let c = fromCol + 1; c <= fromCol + shift; c++) {
+                        for (let r = 0; r < ROWS; r++) {
+                            newGrid[r][c - 1] = grid[r][c];
+                        }
+                    }
+                } else {
+                    // colonnes fromCol+shift .. fromCol-1 avancent de 1 vers la droite
+                    for (let c = fromCol - 1; c >= fromCol + shift; c--) {
+                        for (let r = 0; r < ROWS; r++) {
+                            newGrid[r][c + 1] = grid[r][c];
+                        }
+                    }
+                }
+                // Placer la colonne draguée à sa cible
+                for (let r = 0; r < ROWS; r++) {
+                    newGrid[r][toCol] = draggedCol[r];
+                }
+                grid = newGrid;
+            }
+
+            // Cleanup
+            setTimeout(() => {
+                for (let i = 0; i < tileElements.length; i++) {
+                    tileElements[i].style.zIndex = '';
+                }
+                updateAllPositions();
+                isColumnDragging = false;
+                columnDragIndex = -1;
+                columnDragOffset = 0;
+                columnLiveShift = 0;
+                isAnimating = false;
+                if (shift !== 0) {
+                    moveCount++;
+                    document.getElementById('moveCount').textContent = moveCount;
+                }
+            }, 180);
         }
 
         function executeGroupMove(family, direction) {
