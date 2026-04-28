@@ -40,8 +40,8 @@
 
         .square {
             width: var(--cell-size); height: var(--cell-size);
-            background-color: #12131a;
-            border: 1px solid rgba(180, 180, 190, 0.15);
+            background-color: #000;
+            border: 1px solid rgba(220, 220, 230, 0.35);
             border-radius: var(--radius);
             position: absolute;
             overflow: hidden;
@@ -50,8 +50,25 @@
             touch-action: none;
         }
 
-        .square:hover { border-color: rgba(180, 180, 190, 0.25); }
+        .square:hover { border-color: rgba(220, 220, 230, 0.5); }
         .square svg { width: 100%; height: 100%; pointer-events: none; }
+
+        /* ========== EMPTY (case vidée par tap court) ========== */
+        .square.empty {
+            border-color: transparent !important;
+            background-color: transparent !important;
+            cursor: grab;
+            box-shadow: none !important;
+        }
+        .square.empty svg { display: none; }
+
+        /* Animation de disparition (scale 1 -> 0) */
+        .square.vanishing {
+            transition: transform 0.45s cubic-bezier(0.55, 0, 0.7, 0.2), opacity 0.45s ease-out !important;
+            transform: scale(0) !important;
+            opacity: 0 !important;
+            pointer-events: none;
+        }
 
         svg .separator { stroke: rgba(180, 180, 190, 0.3); stroke-width: 1; }
         svg line.icon, svg path.icon, svg circle.icon, svg rect.icon, svg polyline.icon {
@@ -62,6 +79,7 @@
 
         /* ========== SILVER ========== */
         .square.silver {
+            background-color: #12131a;
             border-color: rgba(126, 200, 227, 0.7);
             box-shadow: 0 0 15px rgba(126, 200, 227, 0.25), inset 0 0 20px rgba(126, 200, 227, 0.05);
         }
@@ -74,6 +92,7 @@
 
         /* ========== GOLD ========== */
         .square.gold {
+            background-color: #12131a;
             border-color: rgba(255, 215, 0, 0.7);
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.3), inset 0 0 20px rgba(255, 215, 0, 0.05);
         }
@@ -301,6 +320,18 @@
         let columnDragOffset = 0;       // décalage actuel en px
         let columnLiveShift = 0;        // nb de cases dépassées (entier signé)
 
+        // ========== TAP / HOLD (case noire) ==========
+        // Tap court (< TAP_MAX_MS sans bouger) => disparition
+        // Hold (>= TAP_MAX_MS) ou bougé => column drag
+        const TAP_MAX_MS = 200;
+        const TAP_MOVE_THRESHOLD = 8; // px
+        let pendingTapTimer = null;
+        let pendingTapTileIndex = -1;
+        let pendingTapStartX = 0;
+        let pendingTapStartY = 0;
+        let pendingTapClientX = 0; // pour pouvoir activer le column drag avec la bonne origine
+        let isPendingTap = false;  // true entre mousedown et la décision tap/drag
+
         function findPos(tileIndex) {
             for (let r = 0; r < ROWS; r++)
                 for (let c = 0; c < COLS; c++)
@@ -315,6 +346,112 @@
             return null;
         }
 
+        // ========== EMPTY (cases vidées) ==========
+        const emptySet = new Set();
+
+        function vanishTile(tileIndex) {
+            if (emptySet.has(tileIndex)) return;
+            const tile = tileElements[tileIndex];
+
+            // Marquer immédiatement comme vide dans l'ensemble logique
+            // (pour empêcher les drags de colonne pendant l'animation)
+            emptySet.add(tileIndex);
+
+            // Étape 1 : poser explicitement l'état initial (scale 1, opacité 1)
+            //           sans transition, pour que le navigateur l'enregistre
+            tile.style.transition = 'none';
+            tile.style.transformOrigin = 'center center';
+            tile.style.transform = 'scale(1)';
+            tile.style.opacity = '1';
+
+            // Étape 2 : double rAF pour forcer le navigateur à valider l'état initial
+            //           AVANT d'appliquer la transition vers scale(0)
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    tile.style.transition = 'transform 0.45s cubic-bezier(0.55, 0, 0.7, 0.2), opacity 0.45s ease-out';
+                    tile.style.transform = 'scale(0)';
+                    tile.style.opacity = '0';
+                });
+            });
+
+            // Étape 3 : à la fin de l'animation, on bascule en classe .empty
+            setTimeout(() => {
+                tile.classList.add('empty');
+                tile.style.transition = 'none';
+                tile.style.transform = '';
+                tile.style.opacity = '';
+            }, 500);
+        }
+
+        function restoreTile(tileIndex) {
+            if (!emptySet.has(tileIndex)) return;
+            const tile = tileElements[tileIndex];
+
+            // Retirer l'état vide
+            emptySet.delete(tileIndex);
+            tile.classList.remove('empty');
+
+            // État initial : invisible, échelle 0
+            tile.style.transition = 'none';
+            tile.style.transformOrigin = 'center center';
+            tile.style.transform = 'scale(0)';
+            tile.style.opacity = '0';
+
+            // Double rAF puis animation vers scale(1)
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    tile.style.transition = 'transform 0.40s cubic-bezier(0.2, 0.7, 0.3, 1.2), opacity 0.40s ease-out';
+                    tile.style.transform = 'scale(1)';
+                    tile.style.opacity = '1';
+                });
+            });
+
+            // Cleanup à la fin
+            setTimeout(() => {
+                tile.style.transition = 'none';
+                tile.style.transform = '';
+                tile.style.opacity = '';
+            }, 450);
+        }
+
+        // ========== TAP / HOLD helpers ==========
+        function clearPendingTap() {
+            if (pendingTapTimer !== null) {
+                clearTimeout(pendingTapTimer);
+                pendingTapTimer = null;
+            }
+            isPendingTap = false;
+            pendingTapTileIndex = -1;
+        }
+
+        // Bascule en column drag (appelé sur hold ou sur mouvement)
+        function activateColumnDrag() {
+            if (!isPendingTap) return;
+            const ti = pendingTapTileIndex;
+            const pos = findPos(ti);
+            if (!pos) { clearPendingTap(); return; }
+
+            isColumnDragging = true;
+            columnDragIndex = pos.c;
+            columnDragStartX = pendingTapClientX;
+            columnDragOffset = 0;
+            columnLiveShift = 0;
+
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const t = tileElements[grid[r][c]];
+                    t.style.transition = 'none';
+                    if (c === columnDragIndex) {
+                        t.style.zIndex = '10';
+                    }
+                }
+            }
+
+            isPendingTap = false;
+            pendingTapTimer = null;
+            pendingTapTileIndex = -1;
+        }
+
         function startDrag(e) {
             if (isAnimating) return;
             const tile = e.target.closest('.square');
@@ -326,26 +463,23 @@
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-            // Case noire => column drag
+            // Case noire (pleine ou vide) => en attente : tap court ou hold
             if (!family) {
                 e.preventDefault();
                 const pos = findPos(ti);
                 if (!pos) return;
-                isColumnDragging = true;
-                columnDragIndex = pos.c;
-                columnDragStartX = clientX;
-                columnDragOffset = 0;
-                columnLiveShift = 0;
-                // Élever toutes les tuiles de la colonne draguée au-dessus
-                for (let r = 0; r < ROWS; r++) {
-                    for (let c = 0; c < COLS; c++) {
-                        const t = tileElements[grid[r][c]];
-                        t.style.transition = 'none';
-                        if (c === columnDragIndex) {
-                            t.style.zIndex = '10';
-                        }
-                    }
-                }
+
+                isPendingTap = true;
+                pendingTapTileIndex = ti;
+                pendingTapStartX = clientX;
+                pendingTapStartY = clientY;
+                pendingTapClientX = clientX;
+
+                clearTimeout(pendingTapTimer);
+                pendingTapTimer = setTimeout(() => {
+                    // L'utilisateur maintient => bascule en column drag
+                    activateColumnDrag();
+                }, TAP_MAX_MS);
                 return;
             }
 
@@ -359,6 +493,25 @@
         }
 
         function moveDrag(e) {
+            // Pending tap : si on bouge, on bascule en column drag immédiatement
+            if (isPendingTap) {
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                const dx = clientX - pendingTapStartX;
+                const dy = clientY - pendingTapStartY;
+                if (Math.abs(dx) > TAP_MOVE_THRESHOLD || Math.abs(dy) > TAP_MOVE_THRESHOLD) {
+                    e.preventDefault();
+                    clearTimeout(pendingTapTimer);
+                    pendingTapTimer = null;
+                    activateColumnDrag();
+                    // Maintenant qu'on est en column drag, on traite ce mouvement
+                    columnDragOffset = clientX - columnDragStartX;
+                    renderColumnDrag();
+                    return;
+                }
+                return; // pas encore décidé
+            }
+
             // Column drag : suivi pixel-perfect
             if (isColumnDragging) {
                 e.preventDefault();
@@ -388,6 +541,20 @@
         }
 
         function endDrag() {
+            // Pending tap relâché avant la fin du timer => c'est un tap court
+            // => disparition si pleine, restauration si vide
+            if (isPendingTap) {
+                const ti = pendingTapTileIndex;
+                clearPendingTap();
+                if (ti >= 0) {
+                    if (emptySet.has(ti)) {
+                        restoreTile(ti);
+                    } else {
+                        vanishTile(ti);
+                    }
+                }
+                return;
+            }
             if (isColumnDragging) {
                 finishColumnDrag();
                 return;
@@ -535,16 +702,32 @@
             const oldGrid = grid.map(row => [...row]);
 
             // Positions actuelles des membres
+            // Chaque membre avance d'une case dans la direction, MAIS si la case
+            // d'arrivée est vide (emptySet), il continue jusqu'à atterrir sur une
+            // case non-vide. Sécurité : on borne à ROWS*COLS itérations pour éviter
+            // une boucle infinie si toute la ligne/colonne était vide.
+            const maxSteps = ROWS * COLS;
             const targets = [];
             for (const ti of familySet) {
                 for (let r = 0; r < ROWS; r++) {
                     for (let c = 0; c < COLS; c++) {
                         if (oldGrid[r][c] === ti) {
+                            let toR = ((r + dr) % ROWS + ROWS) % ROWS;
+                            let toC = ((c + dc) % COLS + COLS) % COLS;
+                            let steps = 1;
+                            // Tant que la case cible est vide, on avance encore
+                            while (emptySet.has(oldGrid[toR][toC]) && steps < maxSteps) {
+                                toR = ((toR + dr) % ROWS + ROWS) % ROWS;
+                                toC = ((toC + dc) % COLS + COLS) % COLS;
+                                steps++;
+                                // Si on revient à la case de départ, stop
+                                if (toR === r && toC === c) break;
+                            }
                             targets.push({
                                 tileIndex: ti,
                                 fromR: r, fromC: c,
-                                toR: ((r + dr) % ROWS + ROWS) % ROWS,
-                                toC: ((c + dc) % COLS + COLS) % COLS
+                                toR: toR,
+                                toC: toC
                             });
                         }
                     }
@@ -556,10 +739,11 @@
 
             // Non-famille qui se trouvent sur une case cible : ils doivent bouger
             // Chaque non-famille va à la source DU MEMBRE QUI ARRIVE sur sa case
+            // Les cases vides ne déclenchent pas de swap (elles restent en place)
             const swaps = [];
             for (const t of targets) {
                 const occupant = oldGrid[t.toR][t.toC];
-                if (!familySet.has(occupant)) {
+                if (!familySet.has(occupant) && !emptySet.has(occupant)) {
                     // Ce non-famille est poussé par ce membre précis
                     // Il va à la source de CE membre
                     swaps.push({ normalTile: occupant, toR: t.fromR, toC: t.fromC });
@@ -641,9 +825,17 @@
 
             for (const t of targets) {
                 const tile = tileElements[t.tileIndex];
+                // Élever le membre en mouvement pour qu'il "passe devant"
+                tile.style.zIndex = '5';
                 const targetLeft = t.toC * getCellTotal();
                 const targetTop = t.toR * getCellTotal();
-                const isWrap = Math.abs(t.toC - t.fromC) > 1 || Math.abs(t.toR - t.fromR) > 1;
+
+                // Vrai wrap = le déplacement signé (toC - fromC) est de signe opposé à dc
+                // (idem pour les lignes). Sinon c'est un saut linéaire (passe sur des vides).
+                const deltaC = t.toC - t.fromC;
+                const deltaR = t.toR - t.fromR;
+                const isWrap = (dc !== 0 && Math.sign(deltaC) !== 0 && Math.sign(deltaC) !== Math.sign(dc))
+                            || (dr !== 0 && Math.sign(deltaR) !== 0 && Math.sign(deltaR) !== Math.sign(dr));
 
                 if (isWrap) {
                     const exitLeft = t.fromC * getCellTotal() + pxX;
@@ -657,7 +849,11 @@
                         tile.style.top = targetTop + 'px';
                     }, 160);
                 } else {
-                    tile.style.transition = 'left 0.15s ease-out, top 0.15s ease-out';
+                    // Saut linéaire (1 ou plusieurs cases) : animer en ligne droite
+                    // Durée légèrement augmentée pour les longs sauts
+                    const distance = Math.max(Math.abs(deltaC), Math.abs(deltaR));
+                    const duration = Math.min(0.30, 0.15 + (distance - 1) * 0.05);
+                    tile.style.transition = `left ${duration}s ease-out, top ${duration}s ease-out`;
                     tile.style.left = targetLeft + 'px';
                     tile.style.top = targetTop + 'px';
                 }
@@ -671,9 +867,13 @@
             }
 
             setTimeout(() => {
+                // Reset des z-index élevés pour les sauts
+                for (const t of targets) {
+                    tileElements[t.tileIndex].style.zIndex = '';
+                }
                 updateAllPositions();
                 isAnimating = false;
-            }, 200);
+            }, 320);
         }
 
         // Events
