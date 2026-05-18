@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KANNA - Silver Gold Cosmic v2</title>
+    <title>KANNA - v2 Verrou+Cooldown+Bouclier</title>
     <style>
         :root {
             --cell-size: 80px;
@@ -53,22 +53,16 @@
         .square:hover { border-color: rgba(220, 220, 230, 0.5); }
         .square svg { width: 100%; height: 100%; pointer-events: none; }
 
-        /* ========== EMPTY (case vidée par tap court) ========== */
+        /* ========== EMPTY ========== */
         .square.empty {
-            border-color: transparent !important;
+            border: 1px solid transparent !important;
+            background: transparent !important;
             background-color: transparent !important;
             cursor: grab;
             box-shadow: none !important;
+            animation: none !important;
         }
         .square.empty svg { display: none; }
-
-        /* Animation de disparition (scale 1 -> 0) */
-        .square.vanishing {
-            transition: transform 0.45s cubic-bezier(0.55, 0, 0.7, 0.2), opacity 0.45s ease-out !important;
-            transform: scale(0) !important;
-            opacity: 0 !important;
-            pointer-events: none;
-        }
 
         svg .separator { stroke: rgba(180, 180, 190, 0.3); stroke-width: 1; }
         svg line.icon, svg path.icon, svg circle.icon, svg rect.icon, svg polyline.icon {
@@ -76,6 +70,49 @@
             stroke-linecap: round; stroke-linejoin: round; fill: none;
         }
         svg circle.point { fill: rgba(180, 180, 190, 0.35); stroke: none; }
+
+        /* ========== VERROU (case infranchissable) ========== */
+        .square.locked {
+            border-color: rgba(255, 60, 60, 0.6) !important;
+            background-color: #1a0808 !important;
+            box-shadow: 0 0 12px rgba(255, 60, 60, 0.2), inset 0 0 15px rgba(255, 60, 60, 0.05);
+            cursor: not-allowed;
+        }
+        .square.locked svg line.icon, .square.locked svg path.icon,
+        .square.locked svg circle.icon, .square.locked svg rect.icon {
+            stroke: rgba(255, 60, 60, 0.5);
+        }
+        .square.locked svg circle.point { fill: rgba(255, 60, 60, 0.5); }
+        .square.locked svg .separator { stroke: rgba(255, 60, 60, 0.3); }
+
+        /* ========== COOLDOWN (famille gelée) ========== */
+        .square.cooldown {
+            opacity: 0.3 !important;
+            filter: grayscale(0.8) !important;
+            transition: opacity 0.3s, filter 0.3s !important;
+        }
+
+        /* ========== BOUCLIER (anneau supplémentaire) ========== */
+        .shield-ring {
+            position: absolute;
+            top: 3px; left: 3px; right: 3px; bottom: 3px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: calc(var(--radius) - 2px);
+            pointer-events: none;
+            animation: shieldPulse 2s ease-in-out infinite;
+        }
+        @keyframes shieldPulse {
+            0%, 100% { border-color: rgba(255, 255, 255, 0.5); box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.1); }
+            50% { border-color: rgba(255, 255, 255, 0.8); box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.2); }
+        }
+        .shield-break {
+            animation: shieldBreak 0.4s ease-out forwards !important;
+        }
+        @keyframes shieldBreak {
+            0% { border-color: rgba(255, 255, 255, 0.8); transform: scale(1); opacity: 1; }
+            50% { border-color: rgba(255, 200, 100, 1); transform: scale(1.15); opacity: 0.8; }
+            100% { border-color: transparent; transform: scale(1.3); opacity: 0; }
+        }
 
         /* ========== SILVER ========== */
         .square.silver {
@@ -153,15 +190,18 @@
         .move-counter .silver-label { color: #7ec8e3; }
         .move-counter .gold-label { color: #ffd700; }
         .move-counter .cosmic-label { color: #c4b5fd; }
+        .move-counter .lock-label { color: #ff3c3c; }
     </style>
 </head>
 <body>
 
     <div class="move-counter">
         <span>MOVES: <span id="moveCount">0</span></span>
-        <span class="silver-label">● 7 Silver</span>
-        <span class="gold-label">● 6 Gold</span>
-        <span class="cosmic-label">● 5 Cosmic</span>
+        <span class="silver-label">● Silver</span>
+        <span class="gold-label">● Gold</span>
+        <span class="cosmic-label">● Cosmic</span>
+        <span class="lock-label">🔒 5</span>
+        <span>PAIRS: <span id="pairCount">0</span>/6</span>
     </div>
 
     <div class="grid-wrapper">
@@ -174,33 +214,41 @@
             const vw = window.innerWidth;
             const vh = window.innerHeight;
             const pad = 16;
-            const headerH = 30; // espace pour le compteur
-
+            const headerH = 30;
             const availW = vw - pad;
             const availH = vh - pad - headerH;
-
-            // 10 cellules + 10 gaps en largeur, 5 cellules + 5 gaps en hauteur
             const cellFromW = Math.floor((availW) / 10.5);
             const cellFromH = Math.floor((availH) / 5.5);
-            const cellSize = Math.min(cellFromW, cellFromH, 80); // max 80 comme avant
+            const cellSize = Math.min(cellFromW, cellFromH, 80);
             const gap = Math.max(2, Math.round(cellSize * 0.08));
             const radius = Math.max(4, Math.round(cellSize * 0.15));
-
             document.documentElement.style.setProperty('--cell-size', cellSize + 'px');
             document.documentElement.style.setProperty('--gap', gap + 'px');
             document.documentElement.style.setProperty('--cell-total', (cellSize + gap) + 'px');
             document.documentElement.style.setProperty('--radius', radius + 'px');
-
             return { cellSize, gap, cellTotal: cellSize + gap };
         }
         let sizes = computeSizes();
 
         const COLS = 10;
         const ROWS = 5;
-        // Getters dynamiques
         function getCellTotal() { return sizes.cellTotal; }
 
-        const tilesData = [
+        // ========== 6 LOGOS SVG ==========
+        const logoSVGs = [
+            `<svg viewBox="0 0 80 80"><path class="icon" d="M 40 8 L 48 30 L 72 30 L 52 44 L 60 68 L 40 54 L 20 68 L 28 44 L 8 30 L 32 30 Z"/></svg>`,
+            `<svg viewBox="0 0 80 80"><path class="icon" d="M 40 8 L 68 40 L 40 72 L 12 40 Z"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="icon" x1="40" y1="10" x2="40" y2="70"/><line class="icon" x1="10" y1="40" x2="70" y2="40"/></svg>`,
+            `<svg viewBox="0 0 80 80"><path class="icon" d="M 40 10 L 70 65 L 10 65 Z"/></svg>`,
+            `<svg viewBox="0 0 80 80"><circle class="icon" cx="40" cy="40" r="24"/></svg>`,
+            `<svg viewBox="0 0 80 80"><path class="icon" d="M 40 16 Q 64 16 64 40 Q 64 64 40 64 Q 16 64 16 40 Q 16 24 32 24 Q 48 24 48 40 Q 48 52 40 52 Q 32 52 32 40"/></svg>`
+        ];
+
+        // ========== VERROU SVG (cadenas) ==========
+        const lockSVG = `<svg viewBox="0 0 80 80"><path class="icon" d="M 25 38 L 25 28 Q 25 12 40 12 Q 55 12 55 28 L 55 38"/><rect class="icon" x="20" y="38" width="40" height="30" rx="4"/><circle class="point" cx="40" cy="53" r="4"/></svg>`;
+
+        // ========== 38 icônes domino SVG ==========
+        const blackTileSVGs = [
             `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 12 22 L 22 35 L 32 22"/><path class="icon" d="M 48 58 L 58 45 L 68 58"/></svg>`,
             `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="25" cy="20" r="8"/><circle class="icon" cx="55" cy="20" r="8"/><circle class="icon" cx="40" cy="60" r="8"/></svg>`,
             `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 10 55 L 10 40 L 22 40 L 22 25 L 34 25"/><line class="icon" x1="46" y1="55" x2="70" y2="25"/></svg>`,
@@ -233,42 +281,76 @@
             `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 22 22 L 10 40 L 22 58 L 34 40 Z"/><line class="icon" x1="48" y1="40" x2="70" y2="40"/><circle class="point" cx="48" cy="40" r="3"/><circle class="point" cx="70" cy="40" r="3"/></svg>`,
             `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="22" cy="20" r="8"/><circle class="icon" cx="58" cy="20" r="8"/><path class="icon" d="M 30 55 L 40 65 L 50 55 L 40 45 Z"/></svg>`,
             `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="10" y1="25" x2="34" y2="25"/><line class="icon" x1="22" y1="25" x2="22" y2="55"/><circle class="point" cx="58" cy="30" r="4"/><circle class="point" cx="58" cy="50" r="4"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 22 12 L 22 28 L 38 28"/><path class="icon" d="M 58 28 L 58 12 L 42 12"/><path class="icon" d="M 30 55 Q 40 68 50 55"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 22 50 Q 10 35 22 22 Q 34 35 22 50"/><line class="icon" x1="50" y1="30" x2="68" y2="30"/><line class="icon" x1="50" y1="50" x2="68" y2="50"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 22 32 L 22 12 Q 40 8 58 12 L 58 32"/><circle class="point" cx="30" cy="55" r="3"/><circle class="point" cx="50" cy="55" r="3"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="point" cx="22" cy="30" r="4"/><circle class="point" cx="22" cy="50" r="4"/><line class="icon" x1="22" y1="34" x2="22" y2="46"/><circle class="point" cx="58" cy="40" r="4"/><line class="icon" x1="54" y1="36" x2="46" y2="28"/><line class="icon" x1="54" y1="44" x2="46" y2="52"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 25 20 Q 55 15 55 32"/><path class="icon" d="M 35 25 Q 50 22 50 30"/><path class="icon" d="M 25 60 Q 55 65 55 48"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 10 20 L 34 20 L 22 40 L 34 60 L 10 60 L 22 40 Z"/><line class="icon" x1="50" y1="40" x2="70" y2="40"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 10 20 L 25 20 L 30 10 L 40 30 L 50 10 L 55 20 L 70 20"/><line class="icon" x1="20" y1="60" x2="60" y2="60"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 34 40 Q 20 25 10 40 Q 20 55 34 40"/><path class="icon" d="M 46 40 Q 60 25 70 40 Q 60 55 46 40"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><line class="icon" x1="15" y1="20" x2="35" y2="20"/><line class="icon" x1="35" y1="20" x2="35" y2="32"/><line class="icon" x1="45" y1="20" x2="65" y2="20"/><circle class="point" cx="40" cy="60" r="5"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="22" y1="60" x2="22" y2="35"/><line class="icon" x1="22" y1="35" x2="12" y2="22"/><line class="icon" x1="22" y1="35" x2="32" y2="22"/><path class="icon" d="M 50 35 L 60 25 L 70 35"/><path class="icon" d="M 50 55 L 60 45 L 70 55"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 12 12 L 12 28 L 28 28"/><path class="icon" d="M 68 12 L 68 28 L 52 28"/><path class="icon" d="M 12 68 L 12 52 L 28 52"/><path class="icon" d="M 68 68 L 68 52 L 52 52"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 28 28 A 14 14 0 1 0 28 52 A 10 10 0 1 1 28 28"/><circle class="point" cx="58" cy="40" r="6"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><line class="icon" x1="15" y1="20" x2="65" y2="20" style="stroke-width: 4"/><line class="icon" x1="15" y1="60" x2="65" y2="60"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="icon" cx="22" cy="28" r="8"/><circle class="icon" cx="22" cy="52" r="8"/><line class="icon" x1="50" y1="25" x2="68" y2="40"/><line class="icon" x1="50" y1="55" x2="68" y2="40"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 20 32 L 40 12 L 60 32 Z"/><line class="icon" x1="25" y1="55" x2="55" y2="55"/><line class="icon" x1="30" y1="65" x2="50" y2="65"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="point" cx="22" cy="40" r="5"/><line class="icon" x1="12" y1="40" x2="8" y2="40"/><line class="icon" x1="22" y1="30" x2="22" y2="22"/><line class="icon" x1="32" y1="40" x2="36" y2="40"/><line class="icon" x1="22" y1="50" x2="22" y2="58"/><path class="icon" d="M 52 25 Q 68 40 52 55"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><line class="icon" x1="15" y1="20" x2="25" y2="20"/><line class="icon" x1="35" y1="20" x2="45" y2="20"/><line class="icon" x1="55" y1="20" x2="65" y2="20"/><path class="icon" d="M 20 50 Q 40 70 60 50"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="icon" cx="22" cy="40" r="12"/><circle class="point" cx="22" cy="40" r="3"/><line class="icon" x1="48" y1="25" x2="48" y2="55"/><line class="icon" x1="58" y1="25" x2="58" y2="55"/><line class="icon" x1="68" y1="25" x2="68" y2="55"/></svg>`
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 22 12 L 22 28 L 38 28"/><path class="icon" d="M 58 28 L 58 12 L 42 12"/><path class="icon" d="M 30 55 Q 40 68 50 55"/></svg>`
         ];
 
-        // ========== FAMILLES ==========
-        // Tirer aléatoirement 7 silver, 6 gold, 5 cosmic (sans doublon)
-        const allIndices = Array.from({length: 50}, (_, i) => i);
-        for (let i = allIndices.length - 1; i > 0; i--) {
+        // ========== FAMILLES 4/4/4 + LOGOS ==========
+        const allPositions = Array.from({length: 50}, (_, i) => i);
+        for (let i = allPositions.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [allIndices[i], allIndices[j]] = [allIndices[j], allIndices[i]];
+            [allPositions[i], allPositions[j]] = [allPositions[j], allPositions[i]];
         }
 
-        const families = {}; // tileIndex -> 'silver' | 'gold' | 'cosmic'
-        const silverSet = new Set(allIndices.slice(0, 7));
-        const goldSet = new Set(allIndices.slice(7, 13));
-        const cosmicSet = new Set(allIndices.slice(13, 18));
+        const families = {};
+        const logoIds = {};
+        const silverSet = new Set(allPositions.slice(0, 4));
+        const goldSet = new Set(allPositions.slice(4, 8));
+        const cosmicSet = new Set(allPositions.slice(8, 12));
 
         silverSet.forEach(i => families[i] = 'silver');
         goldSet.forEach(i => families[i] = 'gold');
         cosmicSet.forEach(i => families[i] = 'cosmic');
+
+        // Distribuer 6 logos (chacun 2×, jamais 2× dans la même famille)
+        (function assignLogos() {
+            const byFamily = { silver: [], gold: [], cosmic: [] };
+            for (let i = 0; i < 12; i++) byFamily[families[allPositions[i]]].push(allPositions[i]);
+            const pairPlan = [
+                ['silver','gold'], ['silver','gold'],
+                ['silver','cosmic'], ['silver','cosmic'],
+                ['gold','cosmic'], ['gold','cosmic']
+            ];
+            for (let i = pairPlan.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pairPlan[i], pairPlan[j]] = [pairPlan[j], pairPlan[i]];
+            }
+            const avail = {};
+            for (const k of ['silver','gold','cosmic']) {
+                avail[k] = [...byFamily[k]];
+                for (let i = avail[k].length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [avail[k][i], avail[k][j]] = [avail[k][j], avail[k][i]];
+                }
+            }
+            for (let lid = 0; lid < 6; lid++) {
+                const [f1, f2] = pairPlan[lid];
+                logoIds[avail[f1].pop()] = lid;
+                logoIds[avail[f2].pop()] = lid;
+            }
+        })();
+
+        // ========== BOUCLIER : chaque logo commence avec un bouclier ==========
+        const shieldActive = {}; // tileIndex -> true/false
+        for (const ti in logoIds) shieldActive[ti] = true;
+
+        // ========== CASES VERROU : 5 cases noires aléatoires ==========
+        const lockedSet = new Set();
+        (function assignLocks() {
+            const blackTiles = [];
+            for (let i = 0; i < 50; i++) {
+                if (!families[i]) blackTiles.push(i);
+            }
+            for (let i = blackTiles.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [blackTiles[i], blackTiles[j]] = [blackTiles[j], blackTiles[i]];
+            }
+            for (let i = 0; i < 5; i++) lockedSet.add(blackTiles[i]);
+        })();
+
+        // ========== COOLDOWN : famille gelée pendant 1 tour ==========
+        const cooldownFamilies = new Set(); // 'silver' | 'gold' | 'cosmic'
+
+        let pairsMatched = 0;
 
         // ========== GRILLE ==========
         let grid = [];
@@ -282,11 +364,24 @@
         const container = document.getElementById('gridContainer');
         let tileElements = [];
 
+        let blackIdx = 0;
         for (let i = 0; i < 50; i++) {
             const tile = document.createElement('div');
             tile.className = 'square';
-            if (families[i]) tile.classList.add(families[i]);
-            tile.innerHTML = '';
+            if (families[i]) {
+                tile.classList.add(families[i]);
+                tile.innerHTML = logoSVGs[logoIds[i]];
+                // Ajouter anneau bouclier
+                const ring = document.createElement('div');
+                ring.className = 'shield-ring';
+                tile.appendChild(ring);
+            } else if (lockedSet.has(i)) {
+                tile.classList.add('locked');
+                tile.innerHTML = lockSVG;
+            } else {
+                tile.innerHTML = blackTileSVGs[blackIdx % blackTileSVGs.length];
+                blackIdx++;
+            }
             tile.dataset.index = i;
             container.appendChild(tile);
             tileElements.push(tile);
@@ -305,6 +400,19 @@
         }
         updateAllPositions();
 
+        // ========== COOLDOWN VISUALS ==========
+        function updateCooldownVisuals() {
+            for (let i = 0; i < 50; i++) {
+                if (!families[i]) continue;
+                const tile = tileElements[i];
+                if (cooldownFamilies.has(families[i])) {
+                    tile.classList.add('cooldown');
+                } else {
+                    tile.classList.remove('cooldown');
+                }
+            }
+        }
+
         // ========== DRAG ==========
         let isDragging = false;
         let dragStartX = 0, dragStartY = 0;
@@ -313,24 +421,22 @@
         let moveCount = 0;
         let isAnimating = false;
 
-        // ========== COLUMN DRAG (case noire) ==========
+        // ========== COLUMN DRAG ==========
         let isColumnDragging = false;
-        let columnDragIndex = -1;      // index de la colonne d'origine sélectionnée
-        let columnDragStartX = 0;       // position initiale du curseur
-        let columnDragOffset = 0;       // décalage actuel en px
-        let columnLiveShift = 0;        // nb de cases dépassées (entier signé)
+        let columnDragIndex = -1;
+        let columnDragStartX = 0;
+        let columnDragOffset = 0;
+        let columnLiveShift = 0;
 
-        // ========== TAP / HOLD (case noire) ==========
-        // Tap court (< TAP_MAX_MS sans bouger) => disparition
-        // Hold (>= TAP_MAX_MS) ou bougé => column drag
+        // ========== TAP / HOLD ==========
         const TAP_MAX_MS = 200;
-        const TAP_MOVE_THRESHOLD = 8; // px
+        const TAP_MOVE_THRESHOLD = 8;
         let pendingTapTimer = null;
         let pendingTapTileIndex = -1;
         let pendingTapStartX = 0;
         let pendingTapStartY = 0;
-        let pendingTapClientX = 0; // pour pouvoir activer le column drag avec la bonne origine
-        let isPendingTap = false;  // true entre mousedown et la décision tap/drag
+        let pendingTapClientX = 0;
+        let isPendingTap = false;
 
         function findPos(tileIndex) {
             for (let r = 0; r < ROWS; r++)
@@ -346,26 +452,17 @@
             return null;
         }
 
-        // ========== EMPTY (cases vidées) ==========
+        // ========== EMPTY ==========
         const emptySet = new Set();
 
         function vanishTile(tileIndex) {
             if (emptySet.has(tileIndex)) return;
             const tile = tileElements[tileIndex];
-
-            // Marquer immédiatement comme vide dans l'ensemble logique
-            // (pour empêcher les drags de colonne pendant l'animation)
             emptySet.add(tileIndex);
-
-            // Étape 1 : poser explicitement l'état initial (scale 1, opacité 1)
-            //           sans transition, pour que le navigateur l'enregistre
             tile.style.transition = 'none';
             tile.style.transformOrigin = 'center center';
             tile.style.transform = 'scale(1)';
             tile.style.opacity = '1';
-
-            // Étape 2 : double rAF pour forcer le navigateur à valider l'état initial
-            //           AVANT d'appliquer la transition vers scale(0)
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     tile.style.transition = 'transform 0.45s cubic-bezier(0.55, 0, 0.7, 0.2), opacity 0.45s ease-out';
@@ -373,8 +470,6 @@
                     tile.style.opacity = '0';
                 });
             });
-
-            // Étape 3 : à la fin de l'animation, on bascule en classe .empty
             setTimeout(() => {
                 tile.classList.add('empty');
                 tile.style.transition = 'none';
@@ -386,18 +481,12 @@
         function restoreTile(tileIndex) {
             if (!emptySet.has(tileIndex)) return;
             const tile = tileElements[tileIndex];
-
-            // Retirer l'état vide
             emptySet.delete(tileIndex);
             tile.classList.remove('empty');
-
-            // État initial : invisible, échelle 0
             tile.style.transition = 'none';
             tile.style.transformOrigin = 'center center';
             tile.style.transform = 'scale(0)';
             tile.style.opacity = '0';
-
-            // Double rAF puis animation vers scale(1)
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     tile.style.transition = 'transform 0.40s cubic-bezier(0.2, 0.7, 0.3, 1.2), opacity 0.40s ease-out';
@@ -405,13 +494,22 @@
                     tile.style.opacity = '1';
                 });
             });
-
-            // Cleanup à la fin
             setTimeout(() => {
                 tile.style.transition = 'none';
                 tile.style.transform = '';
                 tile.style.opacity = '';
             }, 450);
+        }
+
+        // ========== BOUCLIER : casser le bouclier ==========
+        function breakShield(tileIndex) {
+            shieldActive[tileIndex] = false;
+            const tile = tileElements[tileIndex];
+            const ring = tile.querySelector('.shield-ring');
+            if (ring) {
+                ring.classList.add('shield-break');
+                setTimeout(() => ring.remove(), 400);
+            }
         }
 
         // ========== TAP / HOLD helpers ==========
@@ -424,7 +522,6 @@
             pendingTapTileIndex = -1;
         }
 
-        // Bascule en column drag (appelé sur hold ou sur mouvement)
         function activateColumnDrag() {
             if (!isPendingTap) return;
             const ti = pendingTapTileIndex;
@@ -441,9 +538,7 @@
                 for (let c = 0; c < COLS; c++) {
                     const t = tileElements[grid[r][c]];
                     t.style.transition = 'none';
-                    if (c === columnDragIndex) {
-                        t.style.zIndex = '10';
-                    }
+                    if (c === columnDragIndex) t.style.zIndex = '10';
                 }
             }
 
@@ -463,7 +558,9 @@
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-            // Case noire (pleine ou vide) => en attente : tap court ou hold
+            // Cases verrouillées : pas de drag
+            if (lockedSet.has(ti)) return;
+
             if (!family) {
                 e.preventDefault();
                 const pos = findPos(ti);
@@ -477,13 +574,16 @@
 
                 clearTimeout(pendingTapTimer);
                 pendingTapTimer = setTimeout(() => {
-                    // L'utilisateur maintient => bascule en column drag
                     activateColumnDrag();
                 }, TAP_MAX_MS);
                 return;
             }
 
-            // Case colorée => comportement famille existant
+            // COOLDOWN : famille gelée → pas de swipe
+            if (cooldownFamilies.has(family)) {
+                return;
+            }
+
             e.preventDefault();
             isDragging = true;
             dragAxis = null;
@@ -493,7 +593,6 @@
         }
 
         function moveDrag(e) {
-            // Pending tap : si on bouge, on bascule en column drag immédiatement
             if (isPendingTap) {
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -504,15 +603,13 @@
                     clearTimeout(pendingTapTimer);
                     pendingTapTimer = null;
                     activateColumnDrag();
-                    // Maintenant qu'on est en column drag, on traite ce mouvement
                     columnDragOffset = clientX - columnDragStartX;
                     renderColumnDrag();
                     return;
                 }
-                return; // pas encore décidé
+                return;
             }
 
-            // Column drag : suivi pixel-perfect
             if (isColumnDragging) {
                 e.preventDefault();
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -541,57 +638,38 @@
         }
 
         function endDrag() {
-            // Pending tap relâché avant la fin du timer => c'est un tap court
-            // => disparition si pleine, restauration si vide
             if (isPendingTap) {
                 const ti = pendingTapTileIndex;
                 clearPendingTap();
-                if (ti >= 0) {
-                    if (emptySet.has(ti)) {
-                        restoreTile(ti);
-                    } else {
-                        vanishTile(ti);
-                    }
+                if (ti >= 0 && !lockedSet.has(ti)) {
+                    if (emptySet.has(ti)) restoreTile(ti);
+                    else vanishTile(ti);
                 }
                 return;
             }
-            if (isColumnDragging) {
-                finishColumnDrag();
-                return;
-            }
+            if (isColumnDragging) { finishColumnDrag(); return; }
             isDragging = false;
             dragAxis = null;
             dragFamily = null;
         }
 
-        // ========== COLUMN DRAG : rendu fluide + snap ==========
+        // ========== COLUMN DRAG ==========
         function renderColumnDrag() {
             const cellTotal = getCellTotal();
             const fromCol = columnDragIndex;
-
-            // Limites : on borne le drag pour qu'il reste dans la grille (pas de wrap)
-            const minOffset = -fromCol * cellTotal;                // colonne 0 max à gauche
-            const maxOffset = (COLS - 1 - fromCol) * cellTotal;    // colonne COLS-1 max à droite
+            const minOffset = -fromCol * cellTotal;
+            const maxOffset = (COLS - 1 - fromCol) * cellTotal;
             if (columnDragOffset < minOffset) columnDragOffset = minOffset;
             if (columnDragOffset > maxOffset) columnDragOffset = maxOffset;
-
-            // Calcul du nb de cases dépassées : on bascule à la moitié d'une case
             const newShift = Math.round(columnDragOffset / cellTotal);
 
-            // 1) La colonne draguée suit le doigt en pixel-perfect
             for (let r = 0; r < ROWS; r++) {
                 const tile = tileElements[grid[r][fromCol]];
                 tile.style.transition = 'none';
                 tile.style.left = (fromCol * cellTotal + columnDragOffset) + 'px';
             }
 
-            // 2) Si le shift live a changé, on anime les colonnes concernées vers leurs nouvelles positions
             if (newShift !== columnLiveShift) {
-                // Pour chaque colonne d'origine c (≠ fromCol), sa position visuelle dépend du shift courant :
-                //   - si c est entre fromCol+1 et fromCol+newShift (newShift>0) : elle se décale de -1 (vers fromCol)
-                //   - si c est entre fromCol+newShift et fromCol-1 (newShift<0) : elle se décale de +1
-                //   - sinon : elle reste à sa position d'origine c
-                // On recalcule la position visuelle de TOUTES les colonnes non-draguées et on anime.
                 for (let c = 0; c < COLS; c++) {
                     if (c === fromCol) continue;
                     const visualC = computeVisualCol(c, fromCol, newShift);
@@ -605,15 +683,11 @@
             }
         }
 
-        // Calcule où la colonne d'origine `c` doit visuellement se trouver
-        // quand la colonne draguée `fromCol` a un shift de `shift` cases.
         function computeVisualCol(c, fromCol, shift) {
             if (shift > 0) {
-                // Draguée va vers la droite : colonnes entre fromCol+1 et fromCol+shift se décalent de -1
                 if (c > fromCol && c <= fromCol + shift) return c - 1;
                 return c;
             } else if (shift < 0) {
-                // Draguée va vers la gauche : colonnes entre fromCol+shift et fromCol-1 se décalent de +1
                 if (c >= fromCol + shift && c < fromCol) return c + 1;
                 return c;
             }
@@ -625,54 +699,31 @@
             const fromCol = columnDragIndex;
             const shift = columnLiveShift;
             const toCol = fromCol + shift;
-
             isAnimating = true;
 
-            // Snap : la colonne draguée glisse vers sa position cible (toCol)
             for (let r = 0; r < ROWS; r++) {
                 const tile = tileElements[grid[r][fromCol]];
                 tile.style.transition = 'left 0.15s ease-out';
                 tile.style.left = (toCol * cellTotal) + 'px';
             }
 
-            // Les autres colonnes sont déjà à leur position visuelle correcte (animées en live).
-            // On les laisse, juste on s'assure qu'elles ont une transition propre.
-
-            // Mise à jour de la grille logique
             if (shift !== 0) {
                 const newGrid = grid.map(row => [...row]);
-                // Sauvegarder la colonne draguée
                 const draggedCol = [];
                 for (let r = 0; r < ROWS; r++) draggedCol.push(grid[r][fromCol]);
-
-                // Décaler les colonnes intermédiaires
                 if (shift > 0) {
-                    // colonnes fromCol+1 .. fromCol+shift reculent de 1 vers la gauche
-                    for (let c = fromCol + 1; c <= fromCol + shift; c++) {
-                        for (let r = 0; r < ROWS; r++) {
-                            newGrid[r][c - 1] = grid[r][c];
-                        }
-                    }
+                    for (let c = fromCol + 1; c <= fromCol + shift; c++)
+                        for (let r = 0; r < ROWS; r++) newGrid[r][c - 1] = grid[r][c];
                 } else {
-                    // colonnes fromCol+shift .. fromCol-1 avancent de 1 vers la droite
-                    for (let c = fromCol - 1; c >= fromCol + shift; c--) {
-                        for (let r = 0; r < ROWS; r++) {
-                            newGrid[r][c + 1] = grid[r][c];
-                        }
-                    }
+                    for (let c = fromCol - 1; c >= fromCol + shift; c--)
+                        for (let r = 0; r < ROWS; r++) newGrid[r][c + 1] = grid[r][c];
                 }
-                // Placer la colonne draguée à sa cible
-                for (let r = 0; r < ROWS; r++) {
-                    newGrid[r][toCol] = draggedCol[r];
-                }
+                for (let r = 0; r < ROWS; r++) newGrid[r][toCol] = draggedCol[r];
                 grid = newGrid;
             }
 
-            // Cleanup
             setTimeout(() => {
-                for (let i = 0; i < tileElements.length; i++) {
-                    tileElements[i].style.zIndex = '';
-                }
+                for (let i = 0; i < tileElements.length; i++) tileElements[i].style.zIndex = '';
                 updateAllPositions();
                 isColumnDragging = false;
                 columnDragIndex = -1;
@@ -686,152 +737,167 @@
             }, 180);
         }
 
+        // ========== LOGO MATCH avec BOUCLIER ==========
+        function checkPathMatches(targets, dr, dc, oldGrid) {
+            const matchPairs = [];
+            const shieldBreaks = []; // tuiles dont le bouclier casse (pas de fusion)
+            const alreadyMatched = new Set();
+
+            for (const t of targets) {
+                const moverLogo = logoIds[t.tileIndex];
+                if (moverLogo === undefined) continue;
+                if (alreadyMatched.has(t.tileIndex)) continue;
+
+                let cr = t.fromR, cc = t.fromC;
+                const maxSteps = ROWS * COLS;
+                for (let step = 0; step < maxSteps; step++) {
+                    cr = ((cr + dr) % ROWS + ROWS) % ROWS;
+                    cc = ((cc + dc) % COLS + COLS) % COLS;
+
+                    const occupant = oldGrid[cr][cc];
+                    if (occupant !== t.tileIndex && !emptySet.has(occupant)) {
+                        const occLogo = logoIds[occupant];
+                        if (occLogo === moverLogo && !alreadyMatched.has(occupant) && !alreadyMatched.has(t.tileIndex)) {
+                            // Vérifier boucliers
+                            const moverShield = shieldActive[t.tileIndex];
+                            const victimShield = shieldActive[occupant];
+
+                            if (moverShield || victimShield) {
+                                // Un ou deux boucliers actifs → casser les boucliers, pas de fusion
+                                if (moverShield) shieldBreaks.push(t.tileIndex);
+                                if (victimShield) shieldBreaks.push(occupant);
+                                alreadyMatched.add(t.tileIndex);
+                                alreadyMatched.add(occupant);
+                            } else {
+                                // Pas de bouclier → fusion
+                                matchPairs.push({ mover: t.tileIndex, victim: occupant });
+                                alreadyMatched.add(t.tileIndex);
+                                alreadyMatched.add(occupant);
+                            }
+                        }
+                    }
+                    if (cr === t.toR && cc === t.toC) break;
+                }
+            }
+            return { matchPairs, shieldBreaks };
+        }
+
         function executeGroupMove(family, direction) {
             isAnimating = true;
 
             const deltas = {
-                'up':    { dr: -1, dc: 0 },
-                'down':  { dr: 1,  dc: 0 },
-                'left':  { dr: 0,  dc: -1 },
-                'right': { dr: 0,  dc: 1 }
+                'up': { dr: -1, dc: 0 }, 'down': { dr: 1, dc: 0 },
+                'left': { dr: 0, dc: -1 }, 'right': { dr: 0, dc: 1 }
             };
             const { dr, dc } = deltas[direction];
             const familySet = getFamilySet(family);
-
-            // Snapshot de la grille actuelle
             const oldGrid = grid.map(row => [...row]);
 
-            // Positions actuelles des membres
-            // Chaque membre avance d'une case dans la direction, MAIS si la case
-            // d'arrivée est vide (emptySet), il continue jusqu'à atterrir sur une
-            // case non-vide. Sécurité : on borne à ROWS*COLS itérations pour éviter
-            // une boucle infinie si toute la ligne/colonne était vide.
-            const maxSteps = ROWS * COLS;
-            const targets = [];
+            const members = [];
             for (const ti of familySet) {
+                if (emptySet.has(ti)) continue;
                 for (let r = 0; r < ROWS; r++) {
                     for (let c = 0; c < COLS; c++) {
                         if (oldGrid[r][c] === ti) {
-                            let toR = ((r + dr) % ROWS + ROWS) % ROWS;
-                            let toC = ((c + dc) % COLS + COLS) % COLS;
-                            let steps = 1;
-                            // Tant que la case cible est vide, on avance encore
-                            while (emptySet.has(oldGrid[toR][toC]) && steps < maxSteps) {
-                                toR = ((toR + dr) % ROWS + ROWS) % ROWS;
-                                toC = ((toC + dc) % COLS + COLS) % COLS;
-                                steps++;
-                                // Si on revient à la case de départ, stop
-                                if (toR === r && toC === c) break;
-                            }
-                            targets.push({
-                                tileIndex: ti,
-                                fromR: r, fromC: c,
-                                toR: toR,
-                                toC: toC
-                            });
+                            members.push({ tileIndex: ti, r, c });
                         }
                     }
                 }
             }
 
-            // Set des cases cibles de la famille
-            const targetKeys = new Set(targets.map(t => t.toR + ',' + t.toC));
+            if (dr === 1) members.sort((a, b) => b.r - a.r);
+            else if (dr === -1) members.sort((a, b) => a.r - b.r);
+            else if (dc === 1) members.sort((a, b) => b.c - a.c);
+            else if (dc === -1) members.sort((a, b) => a.c - b.c);
 
-            // Non-famille qui se trouvent sur une case cible : ils doivent bouger
-            // Chaque non-famille va à la source DU MEMBRE QUI ARRIVE sur sa case
-            // Les cases vides ne déclenchent pas de swap (elles restent en place)
+            const workGrid = oldGrid.map(row => [...row]);
+            const targets = [];
             const swaps = [];
-            for (const t of targets) {
-                const occupant = oldGrid[t.toR][t.toC];
-                if (!familySet.has(occupant) && !emptySet.has(occupant)) {
-                    // Ce non-famille est poussé par ce membre précis
-                    // Il va à la source de CE membre
-                    swaps.push({ normalTile: occupant, toR: t.fromR, toC: t.fromC });
-                }
-            }
 
-            // Mais attention : si la source de ce membre est AUSSI une case cible
-            // d'un autre membre, alors il y a conflit.
-            // Dans ce cas, il faut chaîner : le non-famille va à la source du membre
-            // dont la cible est cette source, etc.
-            // 
-            // Simplifions : on sait que le nombre de cases libérées (sources non-cibles)
-            // = le nombre de non-famille déplacés.
-            // On construit la chaîne : pour chaque non-famille, on suit la chaîne
-            // de sources jusqu'à trouver une source qui n'est pas une cible.
+            for (const m of members) {
+                const fromR = m.r, fromC = m.c;
+                let toR = ((fromR + dr) % ROWS + ROWS) % ROWS;
+                let toC = ((fromC + dc) % COLS + COLS) % COLS;
+                let steps = 1;
+                const maxSteps = ROWS * COLS;
 
-            // Map : cible -> source pour les membres
-            const targetToSource = {};
-            for (const t of targets) {
-                targetToSource[t.toR + ',' + t.toC] = { r: t.fromR, c: t.fromC };
-            }
-
-            // Pour chaque swap, suivre la chaîne
-            for (const s of swaps) {
-                let destR = s.toR;
-                let destC = s.toC;
-                let key = destR + ',' + destC;
-                // Tant que la destination est aussi une case cible d'un membre,
-                // on suit vers la source de ce membre
-                while (targetKeys.has(key)) {
-                    const src = targetToSource[key];
-                    destR = src.r;
-                    destC = src.c;
-                    key = destR + ',' + destC;
-                }
-                s.toR = destR;
-                s.toC = destC;
-            }
-
-            // Construire la nouvelle grille
-            const newGrid = oldGrid.map(row => [...row]);
-
-            // Effacer toutes les positions sources des membres
-            for (const t of targets) {
-                newGrid[t.fromR][t.fromC] = -99;
-            }
-
-            // Placer les membres à leurs cibles
-            for (const t of targets) {
-                newGrid[t.toR][t.toC] = t.tileIndex;
-            }
-
-            // Placer les non-famille à leurs destinations chaînées
-            for (const s of swaps) {
-                newGrid[s.toR][s.toC] = s.normalTile;
-            }
-
-            // Vérification
-            for (let r = 0; r < ROWS; r++) {
-                for (let c = 0; c < COLS; c++) {
-                    if (newGrid[r][c] === -99 || newGrid[r][c] < 0) {
-                        console.error('BUG: case non remplie à', r, c);
-                        isAnimating = false;
-                        return;
+                // Sauter les vides, mais STOPPER devant un verrou
+                while (steps < maxSteps) {
+                    const cellOccupant = workGrid[toR][toC];
+                    if (lockedSet.has(cellOccupant)) {
+                        // Verrou ! On recule d'un pas (ou on reste sur place)
+                        if (steps === 1) {
+                            // Bloqué directement → pas de mouvement
+                            toR = fromR; toC = fromC;
+                        } else {
+                            // Revenir à la case précédente
+                            toR = ((toR - dr) % ROWS + ROWS) % ROWS;
+                            toC = ((toC - dc) % COLS + COLS) % COLS;
+                        }
+                        break;
                     }
+                    if (!emptySet.has(cellOccupant)) break; // case non-vide non-verrou → destination
+                    toR = ((toR + dr) % ROWS + ROWS) % ROWS;
+                    toC = ((toC + dc) % COLS + COLS) % COLS;
+                    steps++;
+                    if (toR === fromR && toC === fromC) break;
                 }
+
+                if (toR === fromR && toC === fromC) {
+                    targets.push({ tileIndex: m.tileIndex, fromR, fromC, toR: fromR, toC: fromC });
+                    continue;
+                }
+
+                const occupant = workGrid[toR][toC];
+                if (familySet.has(occupant) && occupant !== m.tileIndex) {
+                    targets.push({ tileIndex: m.tileIndex, fromR, fromC, toR: fromR, toC: fromC });
+                    continue;
+                }
+                if (lockedSet.has(occupant)) {
+                    targets.push({ tileIndex: m.tileIndex, fromR, fromC, toR: fromR, toC: fromC });
+                    continue;
+                }
+
+                workGrid[fromR][fromC] = occupant;
+                workGrid[toR][toC] = m.tileIndex;
+
+                if (!emptySet.has(occupant) && occupant !== m.tileIndex) {
+                    swaps.push({ normalTile: occupant, toR: fromR, toC: fromC });
+                }
+
+                targets.push({ tileIndex: m.tileIndex, fromR, fromC, toR, toC });
             }
 
-            grid = newGrid;
-            animateMove(targets, swaps, dr, dc);
+            const { matchPairs, shieldBreaks } = checkPathMatches(targets, dr, dc, oldGrid);
+
+            grid = workGrid;
+
+            // COOLDOWN : appliquer le gel
+            cooldownFamilies.delete(family); // cette famille vient de jouer, on retire son ancien cooldown éventuel
+            // Mettre en cooldown la famille qui vient de jouer
+            // (elle sera gelée au prochain tour)
+            // On gère ça simplement : après chaque move, la famille jouée est gelée
+            // On dégèle les autres
+            cooldownFamilies.clear();
+            cooldownFamilies.add(family);
+            updateCooldownVisuals();
+
+            animateMove(targets, swaps, dr, dc, matchPairs, shieldBreaks);
 
             moveCount++;
             document.getElementById('moveCount').textContent = moveCount;
         }
 
-        function animateMove(targets, swaps, dr, dc) {
+        function animateMove(targets, swaps, dr, dc, matchPairs, shieldBreaks) {
             const pxX = dc * getCellTotal();
             const pxY = dr * getCellTotal();
 
             for (const t of targets) {
                 const tile = tileElements[t.tileIndex];
-                // Élever le membre en mouvement pour qu'il "passe devant"
                 tile.style.zIndex = '5';
                 const targetLeft = t.toC * getCellTotal();
                 const targetTop = t.toR * getCellTotal();
 
-                // Vrai wrap = le déplacement signé (toC - fromC) est de signe opposé à dc
-                // (idem pour les lignes). Sinon c'est un saut linéaire (passe sur des vides).
                 const deltaC = t.toC - t.fromC;
                 const deltaR = t.toR - t.fromR;
                 const isWrap = (dc !== 0 && Math.sign(deltaC) !== 0 && Math.sign(deltaC) !== Math.sign(dc))
@@ -849,8 +915,6 @@
                         tile.style.top = targetTop + 'px';
                     }, 160);
                 } else {
-                    // Saut linéaire (1 ou plusieurs cases) : animer en ligne droite
-                    // Durée légèrement augmentée pour les longs sauts
                     const distance = Math.max(Math.abs(deltaC), Math.abs(deltaR));
                     const duration = Math.min(0.30, 0.15 + (distance - 1) * 0.05);
                     tile.style.transition = `left ${duration}s ease-out, top ${duration}s ease-out`;
@@ -867,12 +931,28 @@
             }
 
             setTimeout(() => {
-                // Reset des z-index élevés pour les sauts
-                for (const t of targets) {
-                    tileElements[t.tileIndex].style.zIndex = '';
-                }
+                for (const t of targets) tileElements[t.tileIndex].style.zIndex = '';
                 updateAllPositions();
                 isAnimating = false;
+
+                // Boucliers cassés
+                if (shieldBreaks.length > 0) {
+                    setTimeout(() => {
+                        for (const ti of shieldBreaks) breakShield(ti);
+                    }, 50);
+                }
+
+                // Fusions
+                if (matchPairs.length > 0) {
+                    setTimeout(() => {
+                        for (const mp of matchPairs) {
+                            vanishTile(mp.mover);
+                            vanishTile(mp.victim);
+                        }
+                        pairsMatched += matchPairs.length;
+                        document.getElementById('pairCount').textContent = pairsMatched;
+                    }, 100);
+                }
             }, 320);
         }
 
@@ -883,7 +963,6 @@
         document.addEventListener('touchmove', moveDrag, { passive: false });
         document.addEventListener('mouseup', endDrag);
         document.addEventListener('touchend', endDrag);
-        // Resize handler
         window.addEventListener('resize', () => {
             sizes = computeSizes();
             updateAllPositions();
