@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KANNA - 4S 4G 4C Logo Match</title>
+    <style>
+        :root {
+            --cell-size: 80px;
+            --gap: 10px;
+            --cell-total: 90px;
+            --radius: 14px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; overflow: hidden; touch-action: none; }
+
+        body {
+            background-color: #12131a;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .grid-wrapper {
+            position: relative;
+            width: calc(var(--cell-total) * 10);
+            height: calc(var(--cell-total) * 5);
+            overflow: hidden;
+        }
+
+        .grid-container {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+        }
+
+        .square {
+            width: var(--cell-size); height: var(--cell-size);
+            background-color: #000;
+            border: 1px solid rgba(220, 220, 230, 0.35);
+            border-radius: var(--radius);
+            position: absolute;
+            overflow: hidden;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .square:hover { border-color: rgba(220, 220, 230, 0.5); }
+        .square svg { width: 100%; height: 100%; pointer-events: none; }
+
+        /* ========== EMPTY ========== */
+        .square.empty {
+            border: 1px solid transparent !important;
+            background: transparent !important;
+            background-color: transparent !important;
+            cursor: grab;
+            box-shadow: none !important;
+            animation: none !important;
+        }
+        .square.empty svg { display: none; }
+
+        .square.vanishing {
+            transition: transform 0.45s cubic-bezier(0.55, 0, 0.7, 0.2), opacity 0.45s ease-out !important;
+            transform: scale(0) !important;
+            opacity: 0 !important;
+            pointer-events: none;
+        }
+
+        svg .separator { stroke: rgba(180, 180, 190, 0.3); stroke-width: 1; }
+        svg line.icon, svg path.icon, svg circle.icon, svg rect.icon, svg polyline.icon {
+            stroke: rgba(180, 180, 190, 0.35); stroke-width: 2;
+            stroke-linecap: round; stroke-linejoin: round; fill: none;
+        }
+        svg circle.point { fill: rgba(180, 180, 190, 0.35); stroke: none; }
+
+        /* ========== SILVER ========== */
+        .square.silver {
+            background-color: #12131a;
+            border-color: rgba(126, 200, 227, 0.7);
+            box-shadow: 0 0 15px rgba(126, 200, 227, 0.25), inset 0 0 20px rgba(126, 200, 227, 0.05);
+        }
+        .square.silver svg line.icon, .square.silver svg path.icon,
+        .square.silver svg circle.icon, .square.silver svg rect.icon {
+            stroke: #7ec8e3; filter: drop-shadow(0 0 3px rgba(126, 200, 227, 0.5));
+        }
+        .square.silver svg circle.point { fill: #7ec8e3; filter: drop-shadow(0 0 3px rgba(126, 200, 227, 0.5)); }
+        .square.silver svg .separator { stroke: rgba(126, 200, 227, 0.4); }
+
+        /* ========== GOLD ========== */
+        .square.gold {
+            background-color: #12131a;
+            border-color: rgba(255, 215, 0, 0.7);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3), inset 0 0 20px rgba(255, 215, 0, 0.05);
+        }
+        .square.gold svg line.icon, .square.gold svg path.icon,
+        .square.gold svg circle.icon, .square.gold svg rect.icon {
+            stroke: #ffd700; filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.6));
+        }
+        .square.gold svg circle.point { fill: #ffd700; filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.6)); }
+        .square.gold svg .separator { stroke: rgba(255, 215, 0, 0.4); }
+
+        /* ========== COSMIC ========== */
+        @property --cosmic-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+
+        .square.cosmic {
+            border: 2px solid transparent;
+            background:
+                linear-gradient(#12131a, #12131a) padding-box,
+                conic-gradient(from var(--cosmic-angle, 0deg), #ff006e, #8338ec, #06b6d4, #34d399, #ffd700, #ff006e) border-box;
+            box-shadow:
+                0 0 40px rgba(131, 56, 236, 0.6),
+                0 0 60px rgba(255, 0, 110, 0.3),
+                0 0 80px rgba(6, 182, 212, 0.3),
+                inset 0 0 40px rgba(131, 56, 236, 0.15);
+            animation: cosmicRotate 4s linear infinite, cosmicPulse 2s ease-in-out infinite;
+        }
+        .square.cosmic svg line.icon, .square.cosmic svg path.icon,
+        .square.cosmic svg circle.icon, .square.cosmic svg rect.icon {
+            stroke: #c4b5fd;
+            filter: drop-shadow(0 0 8px rgba(131, 56, 236, 0.9)) drop-shadow(0 0 12px rgba(255, 0, 110, 0.6));
+            animation: cosmicIconShift 3s ease-in-out infinite;
+        }
+        .square.cosmic svg circle.point {
+            fill: #c4b5fd;
+            filter: drop-shadow(0 0 8px rgba(131, 56, 236, 0.9));
+            animation: cosmicPointPulse 1.5s ease-in-out infinite;
+        }
+        .square.cosmic svg .separator { stroke: rgba(196, 181, 253, 0.7); }
+
+        @keyframes cosmicRotate { to { --cosmic-angle: 360deg; } }
+        @keyframes cosmicPulse {
+            0%, 100% { box-shadow: 0 0 40px rgba(131, 56, 236, 0.6), 0 0 60px rgba(255, 0, 110, 0.3), 0 0 80px rgba(6, 182, 212, 0.3), inset 0 0 40px rgba(131, 56, 236, 0.15); }
+            50% { box-shadow: 0 0 55px rgba(131, 56, 236, 0.8), 0 0 80px rgba(255, 0, 110, 0.5), 0 0 100px rgba(6, 182, 212, 0.4), inset 0 0 50px rgba(131, 56, 236, 0.2); }
+        }
+        @keyframes cosmicIconShift { 0%, 100% { stroke: #c4b5fd; } 33% { stroke: #22d3ee; } 66% { stroke: #f472b6; } }
+        @keyframes cosmicPointPulse { 0%, 100% { fill: #c4b5fd; } 50% { fill: #f472b6; } }
+
+        /* ========== INFO ========== */
+        .move-counter {
+            color: rgba(180, 180, 190, 0.5);
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .move-counter .silver-label { color: #7ec8e3; }
+        .move-counter .gold-label { color: #ffd700; }
+        .move-counter .cosmic-label { color: #c4b5fd; }
+    </style>
+</head>
+<body>
+
+    <div class="move-counter">
+        <span>MOVES: <span id="moveCount">0</span></span>
+        <span class="silver-label">● 4 Silver</span>
+        <span class="gold-label">● 4 Gold</span>
+        <span class="cosmic-label">● 4 Cosmic</span>
+        <span>PAIRS: <span id="pairCount">0</span>/6</span>
+    </div>
+
+    <div class="grid-wrapper">
+        <div class="grid-container" id="gridContainer"></div>
+    </div>
+
+    <script>
+        // ========== RESPONSIVE ==========
+        function computeSizes() {
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const pad = 16;
+            const headerH = 30;
+            const availW = vw - pad;
+            const availH = vh - pad - headerH;
+            const cellFromW = Math.floor((availW) / 10.5);
+            const cellFromH = Math.floor((availH) / 5.5);
+            const cellSize = Math.min(cellFromW, cellFromH, 80);
+            const gap = Math.max(2, Math.round(cellSize * 0.08));
+            const radius = Math.max(4, Math.round(cellSize * 0.15));
+            document.documentElement.style.setProperty('--cell-size', cellSize + 'px');
+            document.documentElement.style.setProperty('--gap', gap + 'px');
+            document.documentElement.style.setProperty('--cell-total', (cellSize + gap) + 'px');
+            document.documentElement.style.setProperty('--radius', radius + 'px');
+            return { cellSize, gap, cellTotal: cellSize + gap };
+        }
+        let sizes = computeSizes();
+
+        const COLS = 10;
+        const ROWS = 5;
+        function getCellTotal() { return sizes.cellTotal; }
+
+        // ========== 6 LOGOS SVG (1 par case colorée, centré plein cadre) ==========
+        const logoSVGs = [
+            `<svg viewBox="0 0 80 80"><path class="icon" d="M 40 8 L 48 30 L 72 30 L 52 44 L 60 68 L 40 54 L 20 68 L 28 44 L 8 30 L 32 30 Z"/></svg>`,
+            `<svg viewBox="0 0 80 80"><path class="icon" d="M 40 8 L 68 40 L 40 72 L 12 40 Z"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="icon" x1="40" y1="10" x2="40" y2="70"/><line class="icon" x1="10" y1="40" x2="70" y2="40"/></svg>`,
+            `<svg viewBox="0 0 80 80"><path class="icon" d="M 40 10 L 70 65 L 10 65 Z"/></svg>`,
+            `<svg viewBox="0 0 80 80"><circle class="icon" cx="40" cy="40" r="24"/></svg>`,
+            `<svg viewBox="0 0 80 80"><path class="icon" d="M 40 16 Q 64 16 64 40 Q 64 64 40 64 Q 16 64 16 40 Q 16 24 32 24 Q 48 24 48 40 Q 48 52 40 52 Q 32 52 32 40"/></svg>`
+        ];
+
+        // ========== 38 icônes domino SVG pour les cases noires ==========
+        const blackTileSVGs = [
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 12 22 L 22 35 L 32 22"/><path class="icon" d="M 48 58 L 58 45 L 68 58"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="25" cy="20" r="8"/><circle class="icon" cx="55" cy="20" r="8"/><circle class="icon" cx="40" cy="60" r="8"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 10 55 L 10 40 L 22 40 L 22 25 L 34 25"/><line class="icon" x1="46" y1="55" x2="70" y2="25"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 10 22 L 22 22 L 30 12 L 38 32 L 46 17 L 54 22 L 70 22"/><line class="icon" x1="10" y1="58" x2="70" y2="58"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="12" y1="25" x2="32" y2="55"/><line class="icon" x1="32" y1="25" x2="12" y2="55"/><line class="icon" x1="55" y1="25" x2="55" y2="55"/><line class="icon" x1="48" y1="40" x2="68" y2="40"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 18 28 Q 40 8 62 28"/><path class="icon" d="M 18 52 Q 40 72 62 52"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="point" cx="22" cy="22" r="3"/><circle class="point" cx="12" cy="50" r="3"/><circle class="point" cx="32" cy="50" r="3"/><circle class="point" cx="54" cy="28" r="3"/><circle class="point" cx="64" cy="40" r="3"/><circle class="point" cx="54" cy="52" r="3"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 10 25 Q 25 15 40 25 Q 55 35 70 25"/><path class="icon" d="M 10 55 Q 25 65 40 55 Q 55 45 70 55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="22" y1="20" x2="22" y2="60"/><circle class="point" cx="22" cy="20" r="4"/><line class="icon" x1="58" y1="20" x2="58" y2="60"/><circle class="point" cx="58" cy="60" r="4"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 28 25 Q 10 40 28 55 Q 35 60 35 40"/><circle class="point" cx="58" cy="40" r="4"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><line class="icon" x1="40" y1="32" x2="40" y2="12"/><path class="icon" d="M 30 22 L 40 12 L 50 22"/><line class="icon" x1="40" y1="68" x2="40" y2="48"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 22 40 L 12 50 L 22 60 L 32 50 Z"/><rect class="icon" x="50" y="30" width="18" height="18" rx="2"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="40" cy="20" r="10"/><line class="icon" x1="40" y1="30" x2="40" y2="55"/><line class="icon" x1="30" y1="65" x2="50" y2="65"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 12 25 L 32 40 L 12 55"/><circle class="point" cx="58" cy="32" r="3"/><circle class="point" cx="58" cy="48" r="3"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><line class="icon" x1="20" y1="12" x2="20" y2="32"/><line class="icon" x1="40" y1="12" x2="40" y2="32"/><line class="icon" x1="60" y1="12" x2="60" y2="32"/><path class="icon" d="M 25 55 Q 40 70 55 55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="10" y1="32" x2="34" y2="32"/><line class="icon" x1="10" y1="48" x2="34" y2="48"/><circle class="icon" cx="58" cy="40" r="12"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 20 32 L 40 12 L 60 32"/><path class="icon" d="M 25 60 L 40 48 L 55 60"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 12 55 L 22 25 L 32 55"/><line class="icon" x1="15" y1="45" x2="29" y2="45"/><line class="icon" x1="48" y1="30" x2="68" y2="30"/><line class="icon" x1="48" y1="50" x2="68" y2="50"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="25" cy="20" r="8"/><circle class="icon" cx="55" cy="20" r="8"/><line class="icon" x1="25" y1="28" x2="40" y2="60"/><line class="icon" x1="55" y1="28" x2="40" y2="60"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><rect class="icon" x="10" y="25" width="24" height="30" rx="3"/><line class="icon" x1="48" y1="28" x2="68" y2="28"/><line class="icon" x1="48" y1="40" x2="68" y2="40"/><line class="icon" x1="48" y1="52" x2="68" y2="52"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 15 20 Q 40 35 65 20"/><path class="icon" d="M 15 60 Q 40 45 65 60"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="22" y1="22" x2="22" y2="58"/><circle class="point" cx="22" cy="22" r="3"/><circle class="point" cx="22" cy="40" r="3"/><circle class="point" cx="22" cy="58" r="3"/><path class="icon" d="M 50 30 L 66 40 L 50 50"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="40" cy="20" r="8"/><line class="icon" x1="40" y1="28" x2="25" y2="55"/><line class="icon" x1="40" y1="28" x2="55" y2="55"/><line class="icon" x1="25" y1="55" x2="55" y2="55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 10 30 Q 22 50 34 30"/><path class="icon" d="M 46 50 Q 58 30 70 50"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><line class="icon" x1="20" y1="20" x2="60" y2="20"/><line class="icon" x1="30" y1="30" x2="50" y2="30"/><circle class="point" cx="40" cy="58" r="5"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="point" cx="12" cy="40" r="4"/><circle class="point" cx="22" cy="28" r="4"/><circle class="point" cx="32" cy="52" r="4"/><line class="icon" x1="50" y1="25" x2="50" y2="55"/><line class="icon" x1="60" y1="30" x2="60" y2="50"/><line class="icon" x1="70" y1="35" x2="70" y2="45"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 20 15 L 60 15 L 60 32 L 20 32 Z"/><line class="icon" x1="30" y1="55" x2="50" y2="55"/><line class="icon" x1="40" y1="55" x2="40" y2="68"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 22 20 L 22 45 Q 22 58 10 58"/><path class="icon" d="M 58 60 L 58 35 Q 58 22 70 22"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="25" cy="20" r="6"/><circle class="icon" cx="55" cy="20" r="6"/><line class="icon" x1="25" y1="26" x2="25" y2="32"/><line class="icon" x1="55" y1="26" x2="55" y2="32"/><path class="icon" d="M 20 55 L 40 48 L 60 55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 22 22 L 10 40 L 22 58 L 34 40 Z"/><line class="icon" x1="48" y1="40" x2="70" y2="40"/><circle class="point" cx="48" cy="40" r="3"/><circle class="point" cx="70" cy="40" r="3"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="22" cy="20" r="8"/><circle class="icon" cx="58" cy="20" r="8"/><path class="icon" d="M 30 55 L 40 65 L 50 55 L 40 45 Z"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="10" y1="25" x2="34" y2="25"/><line class="icon" x1="22" y1="25" x2="22" y2="55"/><circle class="point" cx="58" cy="30" r="4"/><circle class="point" cx="58" cy="50" r="4"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 22 12 L 22 28 L 38 28"/><path class="icon" d="M 58 28 L 58 12 L 42 12"/><path class="icon" d="M 30 55 Q 40 68 50 55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 22 50 Q 10 35 22 22 Q 34 35 22 50"/><line class="icon" x1="50" y1="30" x2="68" y2="30"/><line class="icon" x1="50" y1="50" x2="68" y2="50"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 22 32 L 22 12 Q 40 8 58 12 L 58 32"/><circle class="point" cx="30" cy="55" r="3"/><circle class="point" cx="50" cy="55" r="3"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="point" cx="22" cy="30" r="4"/><circle class="point" cx="22" cy="50" r="4"/><line class="icon" x1="22" y1="34" x2="22" y2="46"/><circle class="point" cx="58" cy="40" r="4"/><line class="icon" x1="54" y1="36" x2="46" y2="28"/><line class="icon" x1="54" y1="44" x2="46" y2="52"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 25 20 Q 55 15 55 32"/><path class="icon" d="M 35 25 Q 50 22 50 30"/><path class="icon" d="M 25 60 Q 55 65 55 48"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 10 20 L 34 20 L 22 40 L 34 60 L 10 60 L 22 40 Z"/><line class="icon" x1="50" y1="40" x2="70" y2="40"/></svg>`
+        ];
+
+        // ========== FAMILLES 4/4/4 + LOGOS ==========
+        const allPositions = Array.from({length: 50}, (_, i) => i);
+        for (let i = allPositions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allPositions[i], allPositions[j]] = [allPositions[j], allPositions[i]];
+        }
+
+        const families = {};
+        const logoIds = {};  // tileIndex -> logoId (0-5)
+        const silverSet = new Set(allPositions.slice(0, 4));
+        const goldSet = new Set(allPositions.slice(4, 8));
+        const cosmicSet = new Set(allPositions.slice(8, 12));
+
+        silverSet.forEach(i => families[i] = 'silver');
+        goldSet.forEach(i => families[i] = 'gold');
+        cosmicSet.forEach(i => families[i] = 'cosmic');
+
+        // Distribuer 6 logos (chacun 2×, jamais 2× dans la même famille)
+        (function assignLogos() {
+            const byFamily = { silver: [], gold: [], cosmic: [] };
+            for (let i = 0; i < 12; i++) byFamily[families[allPositions[i]]].push(allPositions[i]);
+
+            // 6 paires inter-familles : 2× SG, 2× SC, 2× GC
+            const pairPlan = [
+                ['silver','gold'], ['silver','gold'],
+                ['silver','cosmic'], ['silver','cosmic'],
+                ['gold','cosmic'], ['gold','cosmic']
+            ];
+            for (let i = pairPlan.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pairPlan[i], pairPlan[j]] = [pairPlan[j], pairPlan[i]];
+            }
+
+            const avail = {};
+            for (const k of ['silver','gold','cosmic']) {
+                avail[k] = [...byFamily[k]];
+                for (let i = avail[k].length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [avail[k][i], avail[k][j]] = [avail[k][j], avail[k][i]];
+                }
+            }
+
+            for (let lid = 0; lid < 6; lid++) {
+                const [f1, f2] = pairPlan[lid];
+                logoIds[avail[f1].pop()] = lid;
+                logoIds[avail[f2].pop()] = lid;
+            }
+        })();
+
+        let pairsMatched = 0;
+
+        // ========== GRILLE ==========
+        let grid = [];
+        for (let r = 0; r < ROWS; r++) {
+            grid[r] = [];
+            for (let c = 0; c < COLS; c++) {
+                grid[r][c] = r * COLS + c;
+            }
+        }
+
+        const container = document.getElementById('gridContainer');
+        let tileElements = [];
+
+        // Compteur SVG noires (on en a 38, on en utilise 38)
+        let blackIdx = 0;
+        for (let i = 0; i < 50; i++) {
+            const tile = document.createElement('div');
+            tile.className = 'square';
+            if (families[i]) {
+                tile.classList.add(families[i]);
+                tile.innerHTML = logoSVGs[logoIds[i]];
+            } else {
+                tile.innerHTML = blackTileSVGs[blackIdx % blackTileSVGs.length];
+                blackIdx++;
+            }
+            tile.dataset.index = i;
+            container.appendChild(tile);
+            tileElements.push(tile);
+        }
+
+        function updateAllPositions() {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const ti = grid[r][c];
+                    const tile = tileElements[ti];
+                    tile.style.transition = 'none';
+                    tile.style.left = (c * getCellTotal()) + 'px';
+                    tile.style.top = (r * getCellTotal()) + 'px';
+                }
+            }
+        }
+        updateAllPositions();
+
+        // ========== DRAG ==========
+        let isDragging = false;
+        let dragStartX = 0, dragStartY = 0;
+        let dragAxis = null;
+        let dragFamily = null;
+        let moveCount = 0;
+        let isAnimating = false;
+
+        // ========== COLUMN DRAG ==========
+        let isColumnDragging = false;
+        let columnDragIndex = -1;
+        let columnDragStartX = 0;
+        let columnDragOffset = 0;
+        let columnLiveShift = 0;
+
+        // ========== TAP / HOLD ==========
+        const TAP_MAX_MS = 200;
+        const TAP_MOVE_THRESHOLD = 8;
+        let pendingTapTimer = null;
+        let pendingTapTileIndex = -1;
+        let pendingTapStartX = 0;
+        let pendingTapStartY = 0;
+        let pendingTapClientX = 0;
+        let isPendingTap = false;
+
+        function findPos(tileIndex) {
+            for (let r = 0; r < ROWS; r++)
+                for (let c = 0; c < COLS; c++)
+                    if (grid[r][c] === tileIndex) return { r, c };
+            return null;
+        }
+
+        function getFamilySet(family) {
+            if (family === 'silver') return silverSet;
+            if (family === 'gold') return goldSet;
+            if (family === 'cosmic') return cosmicSet;
+            return null;
+        }
+
+        // ========== EMPTY ==========
+        const emptySet = new Set();
+
+        function vanishTile(tileIndex) {
+            if (emptySet.has(tileIndex)) return;
+            const tile = tileElements[tileIndex];
+            emptySet.add(tileIndex);
+            tile.style.transition = 'none';
+            tile.style.transformOrigin = 'center center';
+            tile.style.transform = 'scale(1)';
+            tile.style.opacity = '1';
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    tile.style.transition = 'transform 0.45s cubic-bezier(0.55, 0, 0.7, 0.2), opacity 0.45s ease-out';
+                    tile.style.transform = 'scale(0)';
+                    tile.style.opacity = '0';
+                });
+            });
+            setTimeout(() => {
+                tile.classList.add('empty');
+                tile.style.transition = 'none';
+                tile.style.transform = '';
+                tile.style.opacity = '';
+            }, 500);
+        }
+
+        function restoreTile(tileIndex) {
+            if (!emptySet.has(tileIndex)) return;
+            const tile = tileElements[tileIndex];
+            emptySet.delete(tileIndex);
+            tile.classList.remove('empty');
+            tile.style.transition = 'none';
+            tile.style.transformOrigin = 'center center';
+            tile.style.transform = 'scale(0)';
+            tile.style.opacity = '0';
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    tile.style.transition = 'transform 0.40s cubic-bezier(0.2, 0.7, 0.3, 1.2), opacity 0.40s ease-out';
+                    tile.style.transform = 'scale(1)';
+                    tile.style.opacity = '1';
+                });
+            });
+            setTimeout(() => {
+                tile.style.transition = 'none';
+                tile.style.transform = '';
+                tile.style.opacity = '';
+            }, 450);
+        }
+
+        // ========== TAP / HOLD helpers ==========
+        function clearPendingTap() {
+            if (pendingTapTimer !== null) {
+                clearTimeout(pendingTapTimer);
+                pendingTapTimer = null;
+            }
+            isPendingTap = false;
+            pendingTapTileIndex = -1;
+        }
+
+        function activateColumnDrag() {
+            if (!isPendingTap) return;
+            const ti = pendingTapTileIndex;
+            const pos = findPos(ti);
+            if (!pos) { clearPendingTap(); return; }
+
+            isColumnDragging = true;
+            columnDragIndex = pos.c;
+            columnDragStartX = pendingTapClientX;
+            columnDragOffset = 0;
+            columnLiveShift = 0;
+
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const t = tileElements[grid[r][c]];
+                    t.style.transition = 'none';
+                    if (c === columnDragIndex) t.style.zIndex = '10';
+                }
+            }
+
+            isPendingTap = false;
+            pendingTapTimer = null;
+            pendingTapTileIndex = -1;
+        }
+
+        function startDrag(e) {
+            if (isAnimating) return;
+            const tile = e.target.closest('.square');
+            if (!tile) return;
+
+            const ti = parseInt(tile.dataset.index);
+            const family = families[ti];
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            if (!family) {
+                e.preventDefault();
+                const pos = findPos(ti);
+                if (!pos) return;
+
+                isPendingTap = true;
+                pendingTapTileIndex = ti;
+                pendingTapStartX = clientX;
+                pendingTapStartY = clientY;
+                pendingTapClientX = clientX;
+
+                clearTimeout(pendingTapTimer);
+                pendingTapTimer = setTimeout(() => {
+                    activateColumnDrag();
+                }, TAP_MAX_MS);
+                return;
+            }
+
+            e.preventDefault();
+            isDragging = true;
+            dragAxis = null;
+            dragFamily = family;
+            dragStartX = clientX;
+            dragStartY = clientY;
+        }
+
+        function moveDrag(e) {
+            if (isPendingTap) {
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                const dx = clientX - pendingTapStartX;
+                const dy = clientY - pendingTapStartY;
+                if (Math.abs(dx) > TAP_MOVE_THRESHOLD || Math.abs(dy) > TAP_MOVE_THRESHOLD) {
+                    e.preventDefault();
+                    clearTimeout(pendingTapTimer);
+                    pendingTapTimer = null;
+                    activateColumnDrag();
+                    columnDragOffset = clientX - columnDragStartX;
+                    renderColumnDrag();
+                    return;
+                }
+                return;
+            }
+
+            if (isColumnDragging) {
+                e.preventDefault();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                columnDragOffset = clientX - columnDragStartX;
+                renderColumnDrag();
+                return;
+            }
+
+            if (!isDragging || dragAxis !== null) return;
+            e.preventDefault();
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const dx = clientX - dragStartX;
+            const dy = clientY - dragStartY;
+
+            const threshold = 20;
+            if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    dragAxis = dx > 0 ? 'right' : 'left';
+                } else {
+                    dragAxis = dy > 0 ? 'down' : 'up';
+                }
+                executeGroupMove(dragFamily, dragAxis);
+            }
+        }
+
+        function endDrag() {
+            if (isPendingTap) {
+                const ti = pendingTapTileIndex;
+                clearPendingTap();
+                if (ti >= 0) {
+                    if (emptySet.has(ti)) restoreTile(ti);
+                    else vanishTile(ti);
+                }
+                return;
+            }
+            if (isColumnDragging) { finishColumnDrag(); return; }
+            isDragging = false;
+            dragAxis = null;
+            dragFamily = null;
+        }
+
+        // ========== COLUMN DRAG ==========
+        function renderColumnDrag() {
+            const cellTotal = getCellTotal();
+            const fromCol = columnDragIndex;
+            const minOffset = -fromCol * cellTotal;
+            const maxOffset = (COLS - 1 - fromCol) * cellTotal;
+            if (columnDragOffset < minOffset) columnDragOffset = minOffset;
+            if (columnDragOffset > maxOffset) columnDragOffset = maxOffset;
+            const newShift = Math.round(columnDragOffset / cellTotal);
+
+            for (let r = 0; r < ROWS; r++) {
+                const tile = tileElements[grid[r][fromCol]];
+                tile.style.transition = 'none';
+                tile.style.left = (fromCol * cellTotal + columnDragOffset) + 'px';
+            }
+
+            if (newShift !== columnLiveShift) {
+                for (let c = 0; c < COLS; c++) {
+                    if (c === fromCol) continue;
+                    const visualC = computeVisualCol(c, fromCol, newShift);
+                    for (let r = 0; r < ROWS; r++) {
+                        const tile = tileElements[grid[r][c]];
+                        tile.style.transition = 'left 0.18s ease-out';
+                        tile.style.left = (visualC * cellTotal) + 'px';
+                    }
+                }
+                columnLiveShift = newShift;
+            }
+        }
+
+        function computeVisualCol(c, fromCol, shift) {
+            if (shift > 0) {
+                if (c > fromCol && c <= fromCol + shift) return c - 1;
+                return c;
+            } else if (shift < 0) {
+                if (c >= fromCol + shift && c < fromCol) return c + 1;
+                return c;
+            }
+            return c;
+        }
+
+        function finishColumnDrag() {
+            const cellTotal = getCellTotal();
+            const fromCol = columnDragIndex;
+            const shift = columnLiveShift;
+            const toCol = fromCol + shift;
+            isAnimating = true;
+
+            for (let r = 0; r < ROWS; r++) {
+                const tile = tileElements[grid[r][fromCol]];
+                tile.style.transition = 'left 0.15s ease-out';
+                tile.style.left = (toCol * cellTotal) + 'px';
+            }
+
+            if (shift !== 0) {
+                const newGrid = grid.map(row => [...row]);
+                const draggedCol = [];
+                for (let r = 0; r < ROWS; r++) draggedCol.push(grid[r][fromCol]);
+                if (shift > 0) {
+                    for (let c = fromCol + 1; c <= fromCol + shift; c++)
+                        for (let r = 0; r < ROWS; r++) newGrid[r][c - 1] = grid[r][c];
+                } else {
+                    for (let c = fromCol - 1; c >= fromCol + shift; c--)
+                        for (let r = 0; r < ROWS; r++) newGrid[r][c + 1] = grid[r][c];
+                }
+                for (let r = 0; r < ROWS; r++) newGrid[r][toCol] = draggedCol[r];
+                grid = newGrid;
+            }
+
+            setTimeout(() => {
+                for (let i = 0; i < tileElements.length; i++) tileElements[i].style.zIndex = '';
+                updateAllPositions();
+                isColumnDragging = false;
+                columnDragIndex = -1;
+                columnDragOffset = 0;
+                columnLiveShift = 0;
+                isAnimating = false;
+                if (shift !== 0) {
+                    moveCount++;
+                    document.getElementById('moveCount').textContent = moveCount;
+                }
+            }, 180);
+        }
+
+        // ========== LOGO MATCH : trouver les annulations sur le chemin ==========
+        function checkPathMatches(targets, dr, dc, oldGrid) {
+            // Pour chaque membre qui bouge, on parcourt les cases traversées
+            // (de fromR/C vers toR/C dans la direction dr/dc, wrap compris)
+            // Si une case traversée (hors membres de la même famille) a le même logoId
+            // => paire d'annulation
+            const matchPairs = []; // [{mover: tileIndex, victim: tileIndex}]
+            const alreadyMatched = new Set();
+
+            for (const t of targets) {
+                const moverLogo = logoIds[t.tileIndex];
+                if (moverLogo === undefined) continue; // pas de logo (ne devrait pas arriver)
+                if (alreadyMatched.has(t.tileIndex)) continue;
+
+                // Parcourir le chemin case par case
+                let cr = t.fromR, cc = t.fromC;
+                const maxSteps = ROWS * COLS;
+                for (let step = 0; step < maxSteps; step++) {
+                    cr = ((cr + dr) % ROWS + ROWS) % ROWS;
+                    cc = ((cc + dc) % COLS + COLS) % COLS;
+
+                    // On s'arrête quand on atteint la destination
+                    const occupant = oldGrid[cr][cc];
+                    if (occupant !== t.tileIndex && !emptySet.has(occupant)) {
+                        // Vérifier si le logo match
+                        const occLogo = logoIds[occupant];
+                        if (occLogo === moverLogo && !alreadyMatched.has(occupant) && !alreadyMatched.has(t.tileIndex)) {
+                            matchPairs.push({ mover: t.tileIndex, victim: occupant });
+                            alreadyMatched.add(t.tileIndex);
+                            alreadyMatched.add(occupant);
+                        }
+                    }
+                    if (cr === t.toR && cc === t.toC) break;
+                }
+            }
+            return matchPairs;
+        }
+
+        function executeGroupMove(family, direction) {
+            isAnimating = true;
+
+            const deltas = {
+                'up': { dr: -1, dc: 0 }, 'down': { dr: 1, dc: 0 },
+                'left': { dr: 0, dc: -1 }, 'right': { dr: 0, dc: 1 }
+            };
+            const { dr, dc } = deltas[direction];
+            const familySet = getFamilySet(family);
+            const oldGrid = grid.map(row => [...row]);
+
+            // Collecter les positions actuelles des membres
+            const members = [];
+            for (const ti of familySet) {
+                if (emptySet.has(ti)) continue; // membre déjà vanished
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        if (oldGrid[r][c] === ti) {
+                            members.push({ tileIndex: ti, r, c });
+                        }
+                    }
+                }
+            }
+
+            // Trier les membres dans l'ordre de traitement selon la direction
+            // (ceux qui sont "devant" dans la direction doivent bouger en premier)
+            if (dr === 1) members.sort((a, b) => b.r - a.r);       // down: bottom first
+            else if (dr === -1) members.sort((a, b) => a.r - b.r); // up: top first
+            else if (dc === 1) members.sort((a, b) => b.c - a.c);  // right: rightmost first
+            else if (dc === -1) members.sort((a, b) => a.c - b.c); // left: leftmost first
+
+            // Grille de travail pour construire les positions finales
+            const workGrid = oldGrid.map(row => [...row]);
+            const targets = [];
+            const swaps = [];
+
+            for (const m of members) {
+                const fromR = m.r, fromC = m.c;
+                // Avancer d'1 case, sauter les vides uniquement
+                let toR = ((fromR + dr) % ROWS + ROWS) % ROWS;
+                let toC = ((fromC + dc) % COLS + COLS) % COLS;
+                let steps = 1;
+                const maxSteps = ROWS * COLS;
+
+                while (emptySet.has(workGrid[toR][toC]) && steps < maxSteps) {
+                    toR = ((toR + dr) % ROWS + ROWS) % ROWS;
+                    toC = ((toC + dc) % COLS + COLS) % COLS;
+                    steps++;
+                    if (toR === fromR && toC === fromC) break;
+                }
+
+                // Si on retombe sur soi-même (toute la ligne est vide), pas de mouvement
+                if (toR === fromR && toC === fromC) {
+                    targets.push({ tileIndex: m.tileIndex, fromR, fromC, toR: fromR, toC: fromC });
+                    continue;
+                }
+
+                // Vérifier si la cible est un autre membre de la même famille
+                // (déjà placé dans workGrid) → ne pas bouger
+                const occupant = workGrid[toR][toC];
+                if (familySet.has(occupant) && occupant !== m.tileIndex) {
+                    targets.push({ tileIndex: m.tileIndex, fromR, fromC, toR: fromR, toC: fromC });
+                    continue;
+                }
+
+                // Swap : le membre va à toR/toC, l'occupant va à fromR/fromC
+                workGrid[fromR][fromC] = occupant;
+                workGrid[toR][toC] = m.tileIndex;
+
+                if (!emptySet.has(occupant) && occupant !== m.tileIndex) {
+                    swaps.push({ normalTile: occupant, toR: fromR, toC: fromC });
+                }
+
+                targets.push({ tileIndex: m.tileIndex, fromR, fromC, toR, toC });
+            }
+
+            // Détection des annulations sur le chemin
+            const matchPairs = checkPathMatches(targets, dr, dc, oldGrid);
+
+            grid = workGrid;
+            animateMove(targets, swaps, dr, dc, matchPairs);
+
+            moveCount++;
+            document.getElementById('moveCount').textContent = moveCount;
+        }
+
+        function animateMove(targets, swaps, dr, dc, matchPairs) {
+            const pxX = dc * getCellTotal();
+            const pxY = dr * getCellTotal();
+
+            for (const t of targets) {
+                const tile = tileElements[t.tileIndex];
+                tile.style.zIndex = '5';
+                const targetLeft = t.toC * getCellTotal();
+                const targetTop = t.toR * getCellTotal();
+
+                const deltaC = t.toC - t.fromC;
+                const deltaR = t.toR - t.fromR;
+                const isWrap = (dc !== 0 && Math.sign(deltaC) !== 0 && Math.sign(deltaC) !== Math.sign(dc))
+                            || (dr !== 0 && Math.sign(deltaR) !== 0 && Math.sign(deltaR) !== Math.sign(dr));
+
+                if (isWrap) {
+                    const exitLeft = t.fromC * getCellTotal() + pxX;
+                    const exitTop = t.fromR * getCellTotal() + pxY;
+                    tile.style.transition = 'left 0.15s ease-out, top 0.15s ease-out';
+                    tile.style.left = exitLeft + 'px';
+                    tile.style.top = exitTop + 'px';
+                    setTimeout(() => {
+                        tile.style.transition = 'none';
+                        tile.style.left = targetLeft + 'px';
+                        tile.style.top = targetTop + 'px';
+                    }, 160);
+                } else {
+                    const distance = Math.max(Math.abs(deltaC), Math.abs(deltaR));
+                    const duration = Math.min(0.30, 0.15 + (distance - 1) * 0.05);
+                    tile.style.transition = `left ${duration}s ease-out, top ${duration}s ease-out`;
+                    tile.style.left = targetLeft + 'px';
+                    tile.style.top = targetTop + 'px';
+                }
+            }
+
+            for (const s of swaps) {
+                const tile = tileElements[s.normalTile];
+                tile.style.transition = 'left 0.15s ease-out, top 0.15s ease-out';
+                tile.style.left = (s.toC * getCellTotal()) + 'px';
+                tile.style.top = (s.toR * getCellTotal()) + 'px';
+            }
+
+            setTimeout(() => {
+                for (const t of targets) tileElements[t.tileIndex].style.zIndex = '';
+                updateAllPositions();
+                isAnimating = false;
+
+                // Annulations après le move
+                if (matchPairs.length > 0) {
+                    setTimeout(() => {
+                        for (const mp of matchPairs) {
+                            vanishTile(mp.mover);
+                            vanishTile(mp.victim);
+                        }
+                        pairsMatched += matchPairs.length;
+                        document.getElementById('pairCount').textContent = pairsMatched;
+                    }, 100);
+                }
+            }, 320);
+        }
+
+        // Events
+        container.addEventListener('mousedown', startDrag);
+        container.addEventListener('touchstart', startDrag, { passive: false });
+        document.addEventListener('mousemove', moveDrag);
+        document.addEventListener('touchmove', moveDrag, { passive: false });
+        document.addEventListener('mouseup', endDrag);
+        document.addEventListener('touchend', endDrag);
+        window.addEventListener('resize', () => {
+            sizes = computeSizes();
+            updateAllPositions();
+        });
+    </script>
+</body>
+</html>
