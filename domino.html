@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KANNA - v2 Verrou+Cooldown+Bouclier</title>
+    <title>KANNA - 4S 4G 4C Logo Match</title>
     <style>
         :root {
             --cell-size: 80px;
@@ -64,55 +64,19 @@
         }
         .square.empty svg { display: none; }
 
+        .square.vanishing {
+            transition: transform 0.45s cubic-bezier(0.55, 0, 0.7, 0.2), opacity 0.45s ease-out !important;
+            transform: scale(0) !important;
+            opacity: 0 !important;
+            pointer-events: none;
+        }
+
         svg .separator { stroke: rgba(180, 180, 190, 0.3); stroke-width: 1; }
         svg line.icon, svg path.icon, svg circle.icon, svg rect.icon, svg polyline.icon {
             stroke: rgba(180, 180, 190, 0.35); stroke-width: 2;
             stroke-linecap: round; stroke-linejoin: round; fill: none;
         }
         svg circle.point { fill: rgba(180, 180, 190, 0.35); stroke: none; }
-
-        /* ========== VERROU (case infranchissable) ========== */
-        .square.locked {
-            border-color: rgba(255, 60, 60, 0.6) !important;
-            background-color: #1a0808 !important;
-            box-shadow: 0 0 12px rgba(255, 60, 60, 0.2), inset 0 0 15px rgba(255, 60, 60, 0.05);
-            cursor: not-allowed;
-        }
-        .square.locked svg line.icon, .square.locked svg path.icon,
-        .square.locked svg circle.icon, .square.locked svg rect.icon {
-            stroke: rgba(255, 60, 60, 0.5);
-        }
-        .square.locked svg circle.point { fill: rgba(255, 60, 60, 0.5); }
-        .square.locked svg .separator { stroke: rgba(255, 60, 60, 0.3); }
-
-        /* ========== COOLDOWN (famille gelée) ========== */
-        .square.cooldown {
-            opacity: 0.3 !important;
-            filter: grayscale(0.8) !important;
-            transition: opacity 0.3s, filter 0.3s !important;
-        }
-
-        /* ========== BOUCLIER (anneau supplémentaire) ========== */
-        .shield-ring {
-            position: absolute;
-            top: 3px; left: 3px; right: 3px; bottom: 3px;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            border-radius: calc(var(--radius) - 2px);
-            pointer-events: none;
-            animation: shieldPulse 2s ease-in-out infinite;
-        }
-        @keyframes shieldPulse {
-            0%, 100% { border-color: rgba(255, 255, 255, 0.5); box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.1); }
-            50% { border-color: rgba(255, 255, 255, 0.8); box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.2); }
-        }
-        .shield-break {
-            animation: shieldBreak 0.4s ease-out forwards !important;
-        }
-        @keyframes shieldBreak {
-            0% { border-color: rgba(255, 255, 255, 0.8); transform: scale(1); opacity: 1; }
-            50% { border-color: rgba(255, 200, 100, 1); transform: scale(1.15); opacity: 0.8; }
-            100% { border-color: transparent; transform: scale(1.3); opacity: 0; }
-        }
 
         /* ========== SILVER ========== */
         .square.silver {
@@ -190,17 +154,15 @@
         .move-counter .silver-label { color: #7ec8e3; }
         .move-counter .gold-label { color: #ffd700; }
         .move-counter .cosmic-label { color: #c4b5fd; }
-        .move-counter .lock-label { color: #ff3c3c; }
     </style>
 </head>
 <body>
 
     <div class="move-counter">
         <span>MOVES: <span id="moveCount">0</span></span>
-        <span class="silver-label">● Silver</span>
-        <span class="gold-label">● Gold</span>
-        <span class="cosmic-label">● Cosmic</span>
-        <span class="lock-label">🔒 5</span>
+        <span class="silver-label">● 4 Silver</span>
+        <span class="gold-label">● 4 Gold</span>
+        <span class="cosmic-label">● 4 Cosmic</span>
         <span>PAIRS: <span id="pairCount">0</span>/6</span>
     </div>
 
@@ -234,7 +196,7 @@
         const ROWS = 5;
         function getCellTotal() { return sizes.cellTotal; }
 
-        // ========== 6 LOGOS SVG ==========
+        // ========== 6 LOGOS SVG (1 par case colorée, centré plein cadre) ==========
         const logoSVGs = [
             `<svg viewBox="0 0 80 80"><path class="icon" d="M 40 8 L 48 30 L 72 30 L 52 44 L 60 68 L 40 54 L 20 68 L 28 44 L 8 30 L 32 30 Z"/></svg>`,
             `<svg viewBox="0 0 80 80"><path class="icon" d="M 40 8 L 68 40 L 40 72 L 12 40 Z"/></svg>`,
@@ -244,10 +206,7 @@
             `<svg viewBox="0 0 80 80"><path class="icon" d="M 40 16 Q 64 16 64 40 Q 64 64 40 64 Q 16 64 16 40 Q 16 24 32 24 Q 48 24 48 40 Q 48 52 40 52 Q 32 52 32 40"/></svg>`
         ];
 
-        // ========== VERROU SVG (cadenas) ==========
-        const lockSVG = `<svg viewBox="0 0 80 80"><path class="icon" d="M 25 38 L 25 28 Q 25 12 40 12 Q 55 12 55 28 L 55 38"/><rect class="icon" x="20" y="38" width="40" height="30" rx="4"/><circle class="point" cx="40" cy="53" r="4"/></svg>`;
-
-        // ========== 38 icônes domino SVG ==========
+        // ========== 38 icônes domino SVG pour les cases noires ==========
         const blackTileSVGs = [
             `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 12 22 L 22 35 L 32 22"/><path class="icon" d="M 48 58 L 58 45 L 68 58"/></svg>`,
             `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="25" cy="20" r="8"/><circle class="icon" cx="55" cy="20" r="8"/><circle class="icon" cx="40" cy="60" r="8"/></svg>`,
@@ -281,7 +240,12 @@
             `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 22 22 L 10 40 L 22 58 L 34 40 Z"/><line class="icon" x1="48" y1="40" x2="70" y2="40"/><circle class="point" cx="48" cy="40" r="3"/><circle class="point" cx="70" cy="40" r="3"/></svg>`,
             `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><circle class="icon" cx="22" cy="20" r="8"/><circle class="icon" cx="58" cy="20" r="8"/><path class="icon" d="M 30 55 L 40 65 L 50 55 L 40 45 Z"/></svg>`,
             `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><line class="icon" x1="10" y1="25" x2="34" y2="25"/><line class="icon" x1="22" y1="25" x2="22" y2="55"/><circle class="point" cx="58" cy="30" r="4"/><circle class="point" cx="58" cy="50" r="4"/></svg>`,
-            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 22 12 L 22 28 L 38 28"/><path class="icon" d="M 58 28 L 58 12 L 42 12"/><path class="icon" d="M 30 55 Q 40 68 50 55"/></svg>`
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 22 12 L 22 28 L 38 28"/><path class="icon" d="M 58 28 L 58 12 L 42 12"/><path class="icon" d="M 30 55 Q 40 68 50 55"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 22 50 Q 10 35 22 22 Q 34 35 22 50"/><line class="icon" x1="50" y1="30" x2="68" y2="30"/><line class="icon" x1="50" y1="50" x2="68" y2="50"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 22 32 L 22 12 Q 40 8 58 12 L 58 32"/><circle class="point" cx="30" cy="55" r="3"/><circle class="point" cx="50" cy="55" r="3"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><circle class="point" cx="22" cy="30" r="4"/><circle class="point" cx="22" cy="50" r="4"/><line class="icon" x1="22" y1="34" x2="22" y2="46"/><circle class="point" cx="58" cy="40" r="4"/><line class="icon" x1="54" y1="36" x2="46" y2="28"/><line class="icon" x1="54" y1="44" x2="46" y2="52"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="0" y1="40" x2="80" y2="40"/><path class="icon" d="M 25 20 Q 55 15 55 32"/><path class="icon" d="M 35 25 Q 50 22 50 30"/><path class="icon" d="M 25 60 Q 55 65 55 48"/></svg>`,
+            `<svg viewBox="0 0 80 80"><line class="separator" x1="40" y1="0" x2="40" y2="80"/><path class="icon" d="M 10 20 L 34 20 L 22 40 L 34 60 L 10 60 L 22 40 Z"/><line class="icon" x1="50" y1="40" x2="70" y2="40"/></svg>`
         ];
 
         // ========== FAMILLES 4/4/4 + LOGOS ==========
@@ -292,7 +256,7 @@
         }
 
         const families = {};
-        const logoIds = {};
+        const logoIds = {};  // tileIndex -> logoId (0-5)
         const silverSet = new Set(allPositions.slice(0, 4));
         const goldSet = new Set(allPositions.slice(4, 8));
         const cosmicSet = new Set(allPositions.slice(8, 12));
@@ -305,6 +269,8 @@
         (function assignLogos() {
             const byFamily = { silver: [], gold: [], cosmic: [] };
             for (let i = 0; i < 12; i++) byFamily[families[allPositions[i]]].push(allPositions[i]);
+
+            // 6 paires inter-familles : 2× SG, 2× SC, 2× GC
             const pairPlan = [
                 ['silver','gold'], ['silver','gold'],
                 ['silver','cosmic'], ['silver','cosmic'],
@@ -314,6 +280,7 @@
                 const j = Math.floor(Math.random() * (i + 1));
                 [pairPlan[i], pairPlan[j]] = [pairPlan[j], pairPlan[i]];
             }
+
             const avail = {};
             for (const k of ['silver','gold','cosmic']) {
                 avail[k] = [...byFamily[k]];
@@ -322,33 +289,13 @@
                     [avail[k][i], avail[k][j]] = [avail[k][j], avail[k][i]];
                 }
             }
+
             for (let lid = 0; lid < 6; lid++) {
                 const [f1, f2] = pairPlan[lid];
                 logoIds[avail[f1].pop()] = lid;
                 logoIds[avail[f2].pop()] = lid;
             }
         })();
-
-        // ========== BOUCLIER : chaque logo commence avec un bouclier ==========
-        const shieldActive = {}; // tileIndex -> true/false
-        for (const ti in logoIds) shieldActive[ti] = true;
-
-        // ========== CASES VERROU : 5 cases noires aléatoires ==========
-        const lockedSet = new Set();
-        (function assignLocks() {
-            const blackTiles = [];
-            for (let i = 0; i < 50; i++) {
-                if (!families[i]) blackTiles.push(i);
-            }
-            for (let i = blackTiles.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [blackTiles[i], blackTiles[j]] = [blackTiles[j], blackTiles[i]];
-            }
-            for (let i = 0; i < 5; i++) lockedSet.add(blackTiles[i]);
-        })();
-
-        // ========== COOLDOWN : famille gelée pendant 1 tour ==========
-        const cooldownFamilies = new Set(); // 'silver' | 'gold' | 'cosmic'
 
         let pairsMatched = 0;
 
@@ -364,6 +311,7 @@
         const container = document.getElementById('gridContainer');
         let tileElements = [];
 
+        // Compteur SVG noires (on en a 38, on en utilise 38)
         let blackIdx = 0;
         for (let i = 0; i < 50; i++) {
             const tile = document.createElement('div');
@@ -371,13 +319,6 @@
             if (families[i]) {
                 tile.classList.add(families[i]);
                 tile.innerHTML = logoSVGs[logoIds[i]];
-                // Ajouter anneau bouclier
-                const ring = document.createElement('div');
-                ring.className = 'shield-ring';
-                tile.appendChild(ring);
-            } else if (lockedSet.has(i)) {
-                tile.classList.add('locked');
-                tile.innerHTML = lockSVG;
             } else {
                 tile.innerHTML = blackTileSVGs[blackIdx % blackTileSVGs.length];
                 blackIdx++;
@@ -399,19 +340,6 @@
             }
         }
         updateAllPositions();
-
-        // ========== COOLDOWN VISUALS ==========
-        function updateCooldownVisuals() {
-            for (let i = 0; i < 50; i++) {
-                if (!families[i]) continue;
-                const tile = tileElements[i];
-                if (cooldownFamilies.has(families[i])) {
-                    tile.classList.add('cooldown');
-                } else {
-                    tile.classList.remove('cooldown');
-                }
-            }
-        }
 
         // ========== DRAG ==========
         let isDragging = false;
@@ -501,17 +429,6 @@
             }, 450);
         }
 
-        // ========== BOUCLIER : casser le bouclier ==========
-        function breakShield(tileIndex) {
-            shieldActive[tileIndex] = false;
-            const tile = tileElements[tileIndex];
-            const ring = tile.querySelector('.shield-ring');
-            if (ring) {
-                ring.classList.add('shield-break');
-                setTimeout(() => ring.remove(), 400);
-            }
-        }
-
         // ========== TAP / HOLD helpers ==========
         function clearPendingTap() {
             if (pendingTapTimer !== null) {
@@ -558,9 +475,6 @@
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-            // Cases verrouillées : pas de drag
-            if (lockedSet.has(ti)) return;
-
             if (!family) {
                 e.preventDefault();
                 const pos = findPos(ti);
@@ -576,11 +490,6 @@
                 pendingTapTimer = setTimeout(() => {
                     activateColumnDrag();
                 }, TAP_MAX_MS);
-                return;
-            }
-
-            // COOLDOWN : famille gelée → pas de swipe
-            if (cooldownFamilies.has(family)) {
                 return;
             }
 
@@ -641,7 +550,7 @@
             if (isPendingTap) {
                 const ti = pendingTapTileIndex;
                 clearPendingTap();
-                if (ti >= 0 && !lockedSet.has(ti)) {
+                if (ti >= 0) {
                     if (emptySet.has(ti)) restoreTile(ti);
                     else vanishTile(ti);
                 }
@@ -737,49 +646,42 @@
             }, 180);
         }
 
-        // ========== LOGO MATCH avec BOUCLIER ==========
+        // ========== LOGO MATCH : trouver les annulations sur le chemin ==========
         function checkPathMatches(targets, dr, dc, oldGrid) {
-            const matchPairs = [];
-            const shieldBreaks = []; // tuiles dont le bouclier casse (pas de fusion)
+            // Pour chaque membre qui bouge, on parcourt les cases traversées
+            // (de fromR/C vers toR/C dans la direction dr/dc, wrap compris)
+            // Si une case traversée (hors membres de la même famille) a le même logoId
+            // => paire d'annulation
+            const matchPairs = []; // [{mover: tileIndex, victim: tileIndex}]
             const alreadyMatched = new Set();
 
             for (const t of targets) {
                 const moverLogo = logoIds[t.tileIndex];
-                if (moverLogo === undefined) continue;
+                if (moverLogo === undefined) continue; // pas de logo (ne devrait pas arriver)
                 if (alreadyMatched.has(t.tileIndex)) continue;
 
+                // Parcourir le chemin case par case
                 let cr = t.fromR, cc = t.fromC;
                 const maxSteps = ROWS * COLS;
                 for (let step = 0; step < maxSteps; step++) {
                     cr = ((cr + dr) % ROWS + ROWS) % ROWS;
                     cc = ((cc + dc) % COLS + COLS) % COLS;
 
+                    // On s'arrête quand on atteint la destination
                     const occupant = oldGrid[cr][cc];
                     if (occupant !== t.tileIndex && !emptySet.has(occupant)) {
+                        // Vérifier si le logo match
                         const occLogo = logoIds[occupant];
                         if (occLogo === moverLogo && !alreadyMatched.has(occupant) && !alreadyMatched.has(t.tileIndex)) {
-                            // Vérifier boucliers
-                            const moverShield = shieldActive[t.tileIndex];
-                            const victimShield = shieldActive[occupant];
-
-                            if (moverShield || victimShield) {
-                                // Un ou deux boucliers actifs → casser les boucliers, pas de fusion
-                                if (moverShield) shieldBreaks.push(t.tileIndex);
-                                if (victimShield) shieldBreaks.push(occupant);
-                                alreadyMatched.add(t.tileIndex);
-                                alreadyMatched.add(occupant);
-                            } else {
-                                // Pas de bouclier → fusion
-                                matchPairs.push({ mover: t.tileIndex, victim: occupant });
-                                alreadyMatched.add(t.tileIndex);
-                                alreadyMatched.add(occupant);
-                            }
+                            matchPairs.push({ mover: t.tileIndex, victim: occupant });
+                            alreadyMatched.add(t.tileIndex);
+                            alreadyMatched.add(occupant);
                         }
                     }
                     if (cr === t.toR && cc === t.toC) break;
                 }
             }
-            return { matchPairs, shieldBreaks };
+            return matchPairs;
         }
 
         function executeGroupMove(family, direction) {
@@ -793,9 +695,10 @@
             const familySet = getFamilySet(family);
             const oldGrid = grid.map(row => [...row]);
 
+            // Collecter les positions actuelles des membres
             const members = [];
             for (const ti of familySet) {
-                if (emptySet.has(ti)) continue;
+                if (emptySet.has(ti)) continue; // membre déjà vanished
                 for (let r = 0; r < ROWS; r++) {
                     for (let c = 0; c < COLS; c++) {
                         if (oldGrid[r][c] === ti) {
@@ -805,59 +708,48 @@
                 }
             }
 
-            if (dr === 1) members.sort((a, b) => b.r - a.r);
-            else if (dr === -1) members.sort((a, b) => a.r - b.r);
-            else if (dc === 1) members.sort((a, b) => b.c - a.c);
-            else if (dc === -1) members.sort((a, b) => a.c - b.c);
+            // Trier les membres dans l'ordre de traitement selon la direction
+            // (ceux qui sont "devant" dans la direction doivent bouger en premier)
+            if (dr === 1) members.sort((a, b) => b.r - a.r);       // down: bottom first
+            else if (dr === -1) members.sort((a, b) => a.r - b.r); // up: top first
+            else if (dc === 1) members.sort((a, b) => b.c - a.c);  // right: rightmost first
+            else if (dc === -1) members.sort((a, b) => a.c - b.c); // left: leftmost first
 
+            // Grille de travail pour construire les positions finales
             const workGrid = oldGrid.map(row => [...row]);
             const targets = [];
             const swaps = [];
 
             for (const m of members) {
                 const fromR = m.r, fromC = m.c;
+                // Avancer d'1 case, sauter les vides uniquement
                 let toR = ((fromR + dr) % ROWS + ROWS) % ROWS;
                 let toC = ((fromC + dc) % COLS + COLS) % COLS;
                 let steps = 1;
                 const maxSteps = ROWS * COLS;
 
-                // Sauter les vides, mais STOPPER devant un verrou
-                while (steps < maxSteps) {
-                    const cellOccupant = workGrid[toR][toC];
-                    if (lockedSet.has(cellOccupant)) {
-                        // Verrou ! On recule d'un pas (ou on reste sur place)
-                        if (steps === 1) {
-                            // Bloqué directement → pas de mouvement
-                            toR = fromR; toC = fromC;
-                        } else {
-                            // Revenir à la case précédente
-                            toR = ((toR - dr) % ROWS + ROWS) % ROWS;
-                            toC = ((toC - dc) % COLS + COLS) % COLS;
-                        }
-                        break;
-                    }
-                    if (!emptySet.has(cellOccupant)) break; // case non-vide non-verrou → destination
+                while (emptySet.has(workGrid[toR][toC]) && steps < maxSteps) {
                     toR = ((toR + dr) % ROWS + ROWS) % ROWS;
                     toC = ((toC + dc) % COLS + COLS) % COLS;
                     steps++;
                     if (toR === fromR && toC === fromC) break;
                 }
 
+                // Si on retombe sur soi-même (toute la ligne est vide), pas de mouvement
                 if (toR === fromR && toC === fromC) {
                     targets.push({ tileIndex: m.tileIndex, fromR, fromC, toR: fromR, toC: fromC });
                     continue;
                 }
 
+                // Vérifier si la cible est un autre membre de la même famille
+                // (déjà placé dans workGrid) → ne pas bouger
                 const occupant = workGrid[toR][toC];
                 if (familySet.has(occupant) && occupant !== m.tileIndex) {
                     targets.push({ tileIndex: m.tileIndex, fromR, fromC, toR: fromR, toC: fromC });
                     continue;
                 }
-                if (lockedSet.has(occupant)) {
-                    targets.push({ tileIndex: m.tileIndex, fromR, fromC, toR: fromR, toC: fromC });
-                    continue;
-                }
 
+                // Swap : le membre va à toR/toC, l'occupant va à fromR/fromC
                 workGrid[fromR][fromC] = occupant;
                 workGrid[toR][toC] = m.tileIndex;
 
@@ -868,27 +760,17 @@
                 targets.push({ tileIndex: m.tileIndex, fromR, fromC, toR, toC });
             }
 
-            const { matchPairs, shieldBreaks } = checkPathMatches(targets, dr, dc, oldGrid);
+            // Détection des annulations sur le chemin
+            const matchPairs = checkPathMatches(targets, dr, dc, oldGrid);
 
             grid = workGrid;
-
-            // COOLDOWN : appliquer le gel
-            cooldownFamilies.delete(family); // cette famille vient de jouer, on retire son ancien cooldown éventuel
-            // Mettre en cooldown la famille qui vient de jouer
-            // (elle sera gelée au prochain tour)
-            // On gère ça simplement : après chaque move, la famille jouée est gelée
-            // On dégèle les autres
-            cooldownFamilies.clear();
-            cooldownFamilies.add(family);
-            updateCooldownVisuals();
-
-            animateMove(targets, swaps, dr, dc, matchPairs, shieldBreaks);
+            animateMove(targets, swaps, dr, dc, matchPairs);
 
             moveCount++;
             document.getElementById('moveCount').textContent = moveCount;
         }
 
-        function animateMove(targets, swaps, dr, dc, matchPairs, shieldBreaks) {
+        function animateMove(targets, swaps, dr, dc, matchPairs) {
             const pxX = dc * getCellTotal();
             const pxY = dr * getCellTotal();
 
@@ -935,14 +817,7 @@
                 updateAllPositions();
                 isAnimating = false;
 
-                // Boucliers cassés
-                if (shieldBreaks.length > 0) {
-                    setTimeout(() => {
-                        for (const ti of shieldBreaks) breakShield(ti);
-                    }, 50);
-                }
-
-                // Fusions
+                // Annulations après le move
                 if (matchPairs.length > 0) {
                     setTimeout(() => {
                         for (const mp of matchPairs) {
